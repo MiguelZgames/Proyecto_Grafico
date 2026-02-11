@@ -201,17 +201,17 @@
         /* Charts Area */
         .radar-section {
             display: grid;
-            grid-template-columns: 5fr 7fr; /* Optimized 5:7 split for better Bar legibility */
-            gap: 32px; /* Increased spacing */
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
             margin-bottom: 0;
-            align-items: start;
+            align-items: stretch;
         }
         
         .radar-section .card {
             height: 100%;
             display: flex;
             flex-direction: column;
-            padding: 24px; /* Increased padding */
+            padding: 24px;
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
         }
 
@@ -267,8 +267,8 @@
         .num-col { text-align: right; font-family: monospace; }
         
         /* Responsive */
-        @media (max-width: 1400px) { 
-            .radar-section { grid-template-columns: 1fr; } /* Stack earlier for better readability */
+        @media (max-width: 1200px) { 
+            .radar-section { grid-template-columns: 1fr; }
             .chart-title { font-size: 16px; }
         }
         @media (max-width: 1366px) { .grid { grid-template-columns: 260px 1fr; } }
@@ -289,19 +289,24 @@
             padding: 4px 10px; border-radius: 6px; border: 1px solid #e2e8f0;
             font-size: 13px; color: var(--text-color); cursor: pointer;
             transition: all 0.2s; background: white; min-height: 30px;
-            flex-wrap: wrap; max-width: 280px;
+            flex-wrap: nowrap; white-space: nowrap;
         }
         .ms-trigger:hover { border-color: #cbd5e1; }
         .ms-trigger.open { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
         .ms-placeholder { color: var(--text-muted); font-size: 12px; white-space: nowrap; }
         .ms-tag {
             display: inline-flex; align-items: center; gap: 3px;
-            padding: 1px 7px; border-radius: 10px; font-size: 10px;
+            padding: 2px 8px; border-radius: 10px; font-size: 10px;
             font-weight: 600; color: white; white-space: nowrap;
             animation: fadeIn 0.2s ease-out;
         }
         .ms-tag .ms-remove { cursor: pointer; opacity: 0.7; font-size: 12px; margin-left: 2px; }
         .ms-tag .ms-remove:hover { opacity: 1; }
+        .ms-count { font-size: 11px; color: var(--text-muted); font-weight: 600; white-space: nowrap; }
+        .ms-selected-bar {
+            display: flex; flex-wrap: wrap; gap: 5px; align-items: center;
+            padding: 8px 0 0 0;
+        }
         .ms-dropdown {
             position: absolute; top: calc(100% + 4px); right: 0; width: 300px;
             background: white; border: 1px solid #e2e8f0; border-radius: 8px;
@@ -470,14 +475,14 @@
             <div class="card">
                 <div class="chart-title">
                     <span style="font-size:24px; background:var(--bg-color); padding:8px; border-radius:8px;">🕸️</span> 
-                    <div>
+                    <div style="flex:1;">
                         <div style="line-height:1.2;">Análisis Radar</div>
-                        <div style="font-size:12px; color:var(--text-muted); font-weight:400; margin-top:2px;">Perfil multidimensional del agente</div>
+                        <div style="font-size:12px; color:var(--text-muted); font-weight:400; margin-top:2px;">Perfil vs Promedio Global</div>
                     </div>
-                    <div style="margin-left:auto; display:flex; align-items:center; gap:6px;">
+                    <div style="display:flex; align-items:center; gap:6px;">
                         <div class="ms-container" id="msContainer">
                             <div class="ms-trigger" id="msTrigger" onclick="toggleMultiSelect(event)">
-                                <span class="ms-placeholder" id="msPlaceholder">+ Comparar agentes...</span>
+                                <span class="ms-placeholder" id="msPlaceholder">+ Comparar</span>
                             </div>
                             <div class="ms-dropdown" id="msDropdown">
                                 <div class="ms-search">
@@ -491,7 +496,8 @@
                         </button>
                     </div>
                 </div>
-                <div id="radarChart" style="height: 450px; width: 100%;"></div>
+                <div class="ms-selected-bar" id="msSelectedBar"></div>
+                <div id="radarChart" style="height: 520px; width: 100%;"></div>
             </div>
             <div class="card">
                 <div class="chart-title">
@@ -504,7 +510,7 @@
                         ↺
                     </button>
                 </div>
-                <div id="barChart" style="height: 450px; width: 100%;"></div>
+                <div id="barChart" style="height: 520px; width: 100%;"></div>
             </div>
         </div>
 
@@ -595,7 +601,7 @@
     const listEl = document.getElementById('agentList');
     let currentFilter = 'all';
     let selectedCompareIds = [];
-    const compareColors = ['#7c3aed','#f59e0b','#10b981','#ef4444','#06b6d4','#ec4899','#84cc16','#f97316'];
+    const compareColors = ['#f59e0b','#10b981','#ef4444','#06b6d4','#ec4899','#e11d48','#84cc16','#f97316'];
 
     function hexToRgba(hex, alpha) {
         const r = parseInt(hex.slice(1,3), 16);
@@ -746,6 +752,11 @@
 
     function toggleCompareAgent(agentId, event) {
         if (event) event.stopPropagation();
+        // Prevent selecting the agent that is currently active in the ranking
+        const activeItem = document.querySelector('.agent-item.active');
+        const activeId = activeItem ? parseInt(activeItem.dataset.id) : null;
+        if (agentId === activeId) return;
+        
         const idx = selectedCompareIds.indexOf(agentId);
         if (idx > -1) {
             selectedCompareIds.splice(idx, 1);
@@ -768,12 +779,36 @@
     function renderCompareTags() {
         const trigger = document.getElementById('msTrigger');
         const ph = document.getElementById('msPlaceholder');
+        const bar = document.getElementById('msSelectedBar');
         if (!trigger || !ph) return;
-        trigger.querySelectorAll('.ms-tag').forEach(t => t.remove());
-        if (selectedCompareIds.length === 0) {
-            ph.style.display = '';
-        } else {
-            ph.style.display = 'none';
+        
+        // Clear old count from trigger
+        const oldCount = trigger.querySelector('.ms-count');
+        if (oldCount) oldCount.remove();
+        
+        // Clear tags from bar
+        if (bar) bar.innerHTML = '';
+        
+        // Find the currently active (ranking-selected) agent
+        const activeItem = document.querySelector('.agent-item.active');
+        const activeId = activeItem ? parseInt(activeItem.dataset.id) : null;
+        const activeAgent = activeId ? (displayedAgents.find(a => a.id_agente == activeId) || allAgents.find(a => a.id_agente == activeId)) : null;
+        
+        if (bar) {
+            bar.style.display = 'flex';
+            
+            // 1. Always show ranking-selected agent as blue tag (non-removable)
+            if (activeAgent) {
+                const blueTag = document.createElement('span');
+                blueTag.className = 'ms-tag';
+                blueTag.style.background = '#2563eb';
+                const aName = activeAgent.nombre_usuario_agente || activeAgent.id_agente;
+                blueTag.innerHTML = `📌 ${aName}`;
+                blueTag.title = 'Seleccionado del ranking';
+                bar.appendChild(blueTag);
+            }
+            
+            // 2. Render comparison agents in palette colors (removable)
             selectedCompareIds.forEach((id, i) => {
                 const agent = displayedAgents.find(a => a.id_agente == id) || allAgents.find(a => a.id_agente == id);
                 if (!agent) return;
@@ -782,10 +817,20 @@
                 tag.className = 'ms-tag';
                 tag.style.background = color;
                 const name = agent.nombre_usuario_agente || agent.id_agente;
-                const shortName = String(name).length > 14 ? String(name).substring(0, 14) + '…' : name;
-                tag.innerHTML = `${shortName}<span class="ms-remove" onclick="event.stopPropagation(); toggleCompareAgent(${id})">×</span>`;
-                trigger.insertBefore(tag, ph);
+                tag.innerHTML = `${name}<span class="ms-remove" onclick="event.stopPropagation(); toggleCompareAgent(${id})">×</span>`;
+                bar.appendChild(tag);
             });
+        }
+        
+        // Update trigger text
+        if (selectedCompareIds.length === 0) {
+            ph.style.display = '';
+        } else {
+            ph.style.display = 'none';
+            const countEl = document.createElement('span');
+            countEl.className = 'ms-count';
+            countEl.textContent = `${selectedCompareIds.length} agente${selectedCompareIds.length > 1 ? 's' : ''}`;
+            trigger.appendChild(countEl);
         }
     }
 
@@ -808,9 +853,15 @@
         const optionsContainer = document.getElementById('msOptions');
         if (!optionsContainer) return;
         optionsContainer.innerHTML = '';
+        
+        // Find active ranking agent to exclude from dropdown
+        const activeItem = document.querySelector('.agent-item.active');
+        const activeId = activeItem ? parseInt(activeItem.dataset.id) : null;
+        
         const sorted = [...displayedAgents].sort((a,b) => a.rank_global - b.rank_global);
         sorted.forEach(a => {
             if (a._noData) return;
+            if (a.id_agente === activeId) return; // Skip the ranking-selected agent
             const div = document.createElement('div');
             div.className = 'ms-option';
             div.dataset.id = a.id_agente;
@@ -1000,6 +1051,11 @@
         const a = displayedAgents.find(x => x.id_agente == id);
         if(!a) return;
         
+        // Auto-remove this agent from compare list if it was there
+        const compIdx = selectedCompareIds.indexOf(a.id_agente);
+        if (compIdx > -1) selectedCompareIds.splice(compIdx, 1);
+        updateCompareSelect();
+        
         // Profile
         document.getElementById('pName').textContent = a.nombre_usuario_agente || 'Sin Nombre';
         document.getElementById('pId').textContent = a.id_agente;
@@ -1042,6 +1098,7 @@
         if(document.getElementById('valRot')) document.getElementById('valRot').textContent = fmt1(a.Freq_i) + '%';
         if(document.getElementById('valProd')) document.getElementById('valProd').textContent = fmt1(a.Punt_Productos);
 
+        renderCompareTags();
         updateRadarChart();
         updateTrendChart();
         updateMonthlyTable(a);
@@ -1061,36 +1118,41 @@
             'Freq_i', 'Punt_Productos', 'Ti'
         ];
         
-        // Find dynamic Top #1 for the current period
-        const dynamicTop = displayedAgents.find(x => x.rank_global === 1) || staticTopAgent;
+        // Calculate average of ALL agents as benchmark
+        const validAgents = displayedAgents.filter(x => !x._noData);
         
         const s = (obj, key) => (obj[key] || 0);
         const valA = metricKeys.map(k => s(a, k));
-        const valTop = metricKeys.map(k => s(dynamicTop, k));
+        const valAvg = metricKeys.map(k => {
+            if (validAgents.length === 0) return 0;
+            const sum = validAgents.reduce((acc, ag) => acc + s(ag, k), 0);
+            return sum / validAgents.length;
+        });
         
         // --- RADAR DATA ---
         const radarData = [
             {
                 type: 'scatterpolar',
-                r: valTop,
+                r: valAvg,
                 theta: metrics,
                 fill: 'toself',
-                name: `Top #1 (${dynamicTop.nombre_usuario_agente || 'Global'})`,
-                line: {color: '#94a3b8', width: 1, dash: 'dot'},
-                fillcolor: 'rgba(148, 163, 184, 0.15)',
+                name: `Promedio Global (${validAgents.length} agentes)`,
+                line: {color: '#94a3b8', width: 1.5, dash: 'dot'},
+                fillcolor: 'rgba(148, 163, 184, 0.1)',
                 hoverinfo: 'text',
-                text: valTop.map((v, i) => `${metrics[i]}: ${v.toFixed(1)}`)
+                text: valAvg.map((v, i) => `${metrics[i]}: ${v.toFixed(1)}`)
             },
             {
                 type: 'scatterpolar',
                 r: valA,
                 theta: metrics,
                 fill: 'toself',
-                name: 'Seleccionado',
-                line: {color: '#2563eb', width: 2},
-                fillcolor: 'rgba(37, 99, 235, 0.2)',
+                name: a.nombre_usuario_agente || 'Seleccionado',
+                line: {color: '#2563eb', width: 2.5},
+                fillcolor: 'rgba(37, 99, 235, 0.15)',
                 hoverinfo: 'text',
-                text: valA.map((v, i) => `${metrics[i]}: ${v.toFixed(1)}`)
+                text: valA.map((v, i) => `${metrics[i]}: ${v.toFixed(1)}`),
+                showlegend: false
             }
         ];
 
@@ -1100,12 +1162,12 @@
         // Sort: Best (Positive Gap) at Bottom -> Worst (Negative Gap) at Top
         let chartData = metrics.map((m, i) => {
             const vA = valA[i] * 10; // 0-100 scale
-            const vT = valTop[i] * 10;
-            const diff = vA - vT;
+            const vAvg = valAvg[i] * 10;
+            const diff = vA - vAvg;
             return {
                 metric: m,
                 valA: vA,
-                valTop: vT,
+                valTop: vAvg,
                 diff: diff,
                 origIndex: i
             };
@@ -1129,72 +1191,147 @@
         if (topStrengths.length > 0 && topPriorities.length > 0) narrativeText += "  |  ";
         if (topPriorities.length > 0) narrativeText += `<span style='color:#dc2626'><b>Prioridades:</b> ${topPriorities.join(', ')}</span>`;
         if (!narrativeText) narrativeText = "Desempeño alineado con Benchmark";
-
+        // Exclude currently selected agent from compare list
+        const compareIds = selectedCompareIds.filter(id => id != a.id_agente);
+        
         const barData = [];
+        const hasCompare = compareIds.length > 0;
 
-        // Trace 1: Background Track
-        barData.push({
-            y: sortedMetrics,
-            x: sortedMetrics.map(() => 100),
-            type: 'bar',
-            orientation: 'h',
-            marker: { color: '#f8fafc', line: { width: 0 }, cornerradius: 5 },
-            hoverinfo: 'skip',
-            showlegend: false
-        });
+        if (!hasCompare) {
+            // ===== SINGLE AGENT VIEW: Performance-gradient bars =====
+            
+            // Trace 1: Background Track (subtle)
+            barData.push({
+                y: sortedMetrics,
+                x: sortedMetrics.map(() => 100),
+                type: 'bar',
+                orientation: 'h',
+                marker: { color: '#f1f5f9', line: { width: 0 }, cornerradius: 4 },
+                hoverinfo: 'skip',
+                showlegend: false
+            });
 
-        // Trace 2: Selected Agent
-        barData.push({
-            y: sortedMetrics,
-            x: sortedValA,
-            type: 'bar',
-            orientation: 'h',
-            name: 'Seleccionado',
-            marker: { color: '#2563eb', cornerradius: 5 },
-            text: sortedValA.map(v => v.toFixed(1) + '%'),
-            textposition: 'auto',
-            textfont: { family: 'Inter', color: 'white' }, 
-            hovertemplate: '<b>%{y}</b><br>Valor: %{x:.1f}%<extra></extra>'
-        });
+            // Trace 2: Agent bars with performance-based colors
+            const barColors = sortedDiff.map(d => {
+                if (d >= 20) return '#059669';      // Excellent: deep green
+                if (d >= 5)  return '#10b981';       // Good: emerald
+                if (d >= 0)  return '#2563eb';       // At benchmark: blue
+                if (d >= -10) return '#f59e0b';      // Below: amber
+                return '#ef4444';                     // Poor: red
+            });
+            
+            barData.push({
+                y: sortedMetrics,
+                x: sortedValA,
+                type: 'bar',
+                orientation: 'h',
+                name: a.nombre_usuario_agente || 'Seleccionado',
+                marker: { color: barColors, cornerradius: 4 },
+                text: sortedValA.map(v => v >= 8 ? v.toFixed(1) + '%' : ''),
+                textposition: 'inside',
+                insidetextanchor: 'end',
+                textfont: { family: 'Inter', color: 'white', size: 11, weight: 600 },
+                hovertemplate: '<b>%{y}</b><br>Valor: %{x:.1f}%<extra></extra>'
+            });
+            
+            // Trace 3: Value labels outside short bars
+            const outsideText = sortedValA.map(v => v < 8 ? v.toFixed(1) + '%' : '');
+            barData.push({
+                y: sortedMetrics,
+                x: sortedValA.map(v => v < 8 ? v + 2 : null),
+                type: 'scatter',
+                mode: 'text',
+                text: outsideText,
+                textposition: 'middle right',
+                textfont: { family: 'Inter', size: 11, color: '#475569' },
+                hoverinfo: 'skip',
+                showlegend: false
+            });
 
-        // Trace 3: Delta Labels (Right Axis)
-        const deltaText = sortedDiff.map(d => {
-            const sign = d > 0 ? '+' : '';
-            const color = d >= 0 ? '#16a34a' : '#dc2626';
-            return `<span style="color:${color}; font-weight:600;">Δ ${sign}${d.toFixed(1)} pp</span>`;
-        });
+            // Trace 4: Delta Labels (Right Axis) — clean annotations
+            const deltaText = sortedDiff.map(d => {
+                const sign = d > 0 ? '+' : '';
+                const color = d >= 0 ? '#059669' : '#dc2626';
+                const icon = d >= 5 ? '▲' : d <= -5 ? '▼' : '●';
+                return `<span style="color:${color}; font-weight:600;">${icon} ${sign}${d.toFixed(1)}</span>`;
+            });
 
-        barData.push({
-            y: sortedMetrics,
-            x: sortedMetrics.map(() => 115), 
-            type: 'scatter',
-            mode: 'text',
-            text: deltaText,
-            textposition: 'middle left',
-            textfont: { family: 'Inter', size: 12 },
-            hoverinfo: 'skip',
-            showlegend: false
-        });
+            barData.push({
+                y: sortedMetrics,
+                x: sortedMetrics.map(() => 112),
+                type: 'scatter',
+                mode: 'text',
+                text: deltaText,
+                textposition: 'middle left',
+                textfont: { family: 'Inter', size: 11 },
+                hoverinfo: 'skip',
+                showlegend: false
+            });
+            
+        } else {
+            // ===== MULTI-AGENT VIEW: Grouped bars =====
+            
+            // Selected Agent bars (blue)
+            barData.push({
+                y: sortedMetrics,
+                x: sortedValA,
+                type: 'bar',
+                orientation: 'h',
+                name: a.nombre_usuario_agente || 'Seleccionado',
+                marker: { color: '#2563eb', cornerradius: 3 },
+                text: sortedValA.map(v => v >= 12 ? v.toFixed(0) + '%' : ''),
+                textposition: 'inside',
+                insidetextanchor: 'end',
+                textfont: { family: 'Inter', color: 'white', size: 10 },
+                hovertemplate: '<b>%{y}</b><br>%{fullData.name}: %{x:.1f}%<extra></extra>',
+                showlegend: false
+            });
+            
+            // Comparison agents as grouped bars
+            compareIds.forEach((compId, idx) => {
+                const compAgent = displayedAgents.find(x => x.id_agente == compId) || allAgents.find(x => x.id_agente == compId);
+                if (!compAgent) return;
+                const color = compareColors[selectedCompareIds.indexOf(compId) % compareColors.length];
+                const valComp = metricKeys.map(k => s(compAgent, k));
+                const sortedValComp = chartData.map(d => valComp[d.origIndex] * 10);
+                
+                barData.push({
+                    y: sortedMetrics,
+                    x: sortedValComp,
+                    type: 'bar',
+                    orientation: 'h',
+                    name: compAgent.nombre_usuario_agente || 'Comparado',
+                    marker: { color: color, cornerradius: 3 },
+                    text: sortedValComp.map(v => v >= 12 ? v.toFixed(0) + '%' : ''),
+                    textposition: 'inside',
+                    insidetextanchor: 'end',
+                    textfont: { family: 'Inter', color: 'white', size: 10 },
+                    hovertemplate: '<b>%{y}</b><br>%{fullData.name}: %{x:.1f}%<extra></extra>',
+                    showlegend: false
+                });
+            });
+        }
 
-        // Trace 4: Benchmark Markers (Invisible for hover)
+        // Benchmark Markers (Invisible for hover on benchmark value)
         barData.push({
             y: sortedMetrics,
             x: sortedValTop,
             type: 'scatter',
             mode: 'markers',
-            name: 'Benchmark',
-            marker: { opacity: 0, size: 20 },
-            hoverinfo: 'name+x'
+            name: 'Promedio',
+            marker: { opacity: 0, size: 15 },
+            hovertemplate: '<b>%{y}</b><br>Promedio: %{x:.1f}%<extra></extra>',
+            showlegend: false
         });
 
-        // Handle Multiple Comparison Agents
-        selectedCompareIds.forEach((compId, idx) => {
+        // Handle Comparison Agents for RADAR only (bar is handled above)
+        compareIds.forEach((compId, idx) => {
             const compAgent = displayedAgents.find(x => x.id_agente == compId) || allAgents.find(x => x.id_agente == compId);
             if (!compAgent) return;
-            const color = compareColors[idx % compareColors.length];
+            const color = compareColors[selectedCompareIds.indexOf(compId) % compareColors.length];
             const valComp = metricKeys.map(k => s(compAgent, k));
 
-            // Add to Radar
+            // Add to Radar (no legend — tags are shown above)
             radarData.push({
                 type: 'scatterpolar',
                 r: valComp,
@@ -1204,25 +1341,8 @@
                 line: {color: color, width: 2},
                 fillcolor: hexToRgba(color, 0.15),
                 hoverinfo: 'text',
-                text: valComp.map((v, i) => `${metrics[i]}: ${v.toFixed(1)}`)
-            });
-
-            // Add to Bar (Sorted)
-            const sortedValComp = chartData.map(d => valComp[d.origIndex] * 10);
-
-            barData.push({
-                y: sortedMetrics,
-                x: sortedValComp,
-                type: 'scatter',
-                mode: 'markers',
-                name: compAgent.nombre_usuario_agente || 'Comparado',
-                marker: {
-                    symbol: 'diamond',
-                    size: 10,
-                    color: color,
-                    line: { width: 1, color: '#ffffff' }
-                },
-                hoverinfo: 'x+name'
+                text: valComp.map((v, i) => `${metrics[i]}: ${v.toFixed(1)}`),
+                showlegend: false
             });
         });
 
@@ -1243,30 +1363,39 @@
                 radialaxis: { visible: true, range: [0, 10], showticklabels: false, ticks: '' },
                 angularaxis: { tickfont: { size: 11, color: '#64748b', family: 'Inter, sans-serif' } }
             },
-            margin: { t: 40, b: 40, l: 60, r: 60 },
+            margin: { t: 30, b: 30, l: 50, r: 50 },
             showlegend: true,
-            legend: { orientation: 'h', y: -0.15, xanchor: 'center', x: 0.5 },
+            legend: { orientation: 'h', y: -0.05, xanchor: 'center', x: 0.5, font: { size: 11, color: '#94a3b8' } },
             paper_bgcolor: 'rgba(0,0,0,0)',
             plot_bgcolor: 'rgba(0,0,0,0)',
             transition: { duration: 300, easing: 'cubic-in-out' },
-            height: 450
+            height: 520
         };
 
         const barLayout = {
             title: {
-                text: narrativeText,
+                text: hasCompare ? '' : narrativeText,
                 x: 0,
                 y: 0.98,
                 xanchor: 'left',
                 yanchor: 'top',
-                font: { family: 'Inter', size: 13, color: '#0f172a' },
-                pad: { b: 10 }
+                font: { family: 'Inter', size: 12, color: '#0f172a' },
+                pad: { b: 8 }
             },
-            margin: { t: 60, b: 20, l: 140, r: 80 }, 
-            barmode: 'overlay',
-            xaxis: { range: [0, 130], showgrid: false, zeroline: false, showticklabels: false, fixedrange: true },
+            margin: { t: hasCompare ? 20 : 50, b: 20, l: 130, r: hasCompare ? 20 : 70 }, 
+            barmode: hasCompare ? 'group' : 'overlay',
+            xaxis: { 
+                range: [0, hasCompare ? 105 : 130], 
+                showgrid: hasCompare, 
+                gridcolor: '#f1f5f9',
+                zeroline: false, 
+                showticklabels: hasCompare,
+                ticksuffix: '%',
+                tickfont: { size: 10, color: '#94a3b8', family: 'Inter' },
+                fixedrange: true 
+            },
             yaxis: { 
-                tickfont: { size: 12, color: '#0f172a', family: 'Inter' },
+                tickfont: { size: 11, color: '#0f172a', family: 'Inter' },
                 gridcolor: 'rgba(0,0,0,0)',
                 automargin: true,
                 fixedrange: true
@@ -1274,9 +1403,10 @@
             shapes: shapes,
             paper_bgcolor: 'rgba(0,0,0,0)',
             plot_bgcolor: 'rgba(0,0,0,0)',
-            height: 450,
+            height: 520,
             showlegend: false,
-            bargap: 0.4
+            bargap: hasCompare ? 0.25 : 0.4,
+            bargroupgap: hasCompare ? 0.08 : 0
         };
         
         Plotly.newPlot('radarChart', radarData, radarLayout, {displayModeBar: false, responsive: true});
