@@ -200,23 +200,23 @@ def generate_html_report(df_agents, df_monthly=None, out_path="reports/dashboard
         
         /* Header */
         header { 
-            background: var(--card-bg); padding: 15px 30px; 
+            background: var(--card-bg); padding: 10px 24px; 
             border-bottom: 1px solid var(--border); 
             display: flex; justify-content: space-between; align-items: center; 
             box-shadow: 0 2px 4px rgba(0,0,0,0.02);
             position: sticky; top: 0; z-index: 100;
         }
-        h1 { margin: 0; font-size: 22px; font-weight: 600; color: var(--primary); letter-spacing: -0.5px; }
-        .header-meta { font-size: 14px; color: var(--text-muted); margin-top: 4px; font-weight: 500; }
+        h1 { margin: 0; font-size: 18px; font-weight: 600; color: var(--primary); letter-spacing: -0.5px; }
+        .header-meta { font-size: 12px; color: var(--text-muted); margin-top: 2px; font-weight: 500; }
         
-        .kpi-bar { display: flex; gap: 30px; }
+        .kpi-bar { display: flex; gap: 20px; }
         .kpi { text-align: center; position: relative; }
-        .kpi-val { font-size: 22px; font-weight: 700; line-height: 1.2; }
-        .kpi-lbl { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); font-weight: 500; }
+        .kpi-val { font-size: 18px; font-weight: 700; line-height: 1.2; }
+        .kpi-lbl { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); font-weight: 500; }
         .tag-a { color: var(--success); } .tag-b { color: var(--warning); } .tag-c { color: var(--danger); }
         
         /* Layout Grid */
-        .grid { display: grid; grid-template-columns: 320px 1fr; gap: 25px; flex: 1; overflow: hidden; margin-top: 20px; }
+        .grid { display: grid; grid-template-columns: 280px 1fr; gap: 16px; flex: 1; overflow: hidden; margin-top: 10px; }
         
         /* Sidebar */
         .sidebar { 
@@ -226,12 +226,12 @@ def generate_html_report(df_agents, df_monthly=None, out_path="reports/dashboard
             overflow: hidden;
         }
         .sidebar-header { 
-            padding: 20px; 
+            padding: 12px 14px; 
             border-bottom: 1px solid var(--border); 
             background: #fafbfc; 
             display: flex;
             flex-direction: column;
-            gap: 12px;
+            gap: 8px;
         }
         .search-box { 
             width: 100%; padding: 10px 12px; border: 1px solid #dfe6e9; border-radius: 6px; 
@@ -288,14 +288,14 @@ def generate_html_report(df_agents, df_monthly=None, out_path="reports/dashboard
         
         .agent-list { flex: 1; overflow-y: auto; padding: 0; }
         .agent-item { 
-            padding: 12px 20px; border-bottom: 1px solid var(--border); cursor: pointer; 
+            padding: 8px 14px; border-bottom: 1px solid var(--border); cursor: pointer; 
             display: flex; justify-content: space-between; align-items: center; 
             transition: background 0.15s;
         }
         .agent-item:hover { background-color: #f8f9fa; }
-        .agent-item.active { background-color: var(--accent-soft); border-left: 4px solid var(--accent); padding-left: 16px; }
+        .agent-item.active { background-color: var(--accent-soft); border-left: 4px solid var(--accent); padding-left: 10px; }
         .agent-rank { font-size: 12px; font-weight: 600; color: var(--text-muted); width: 35px; }
-        .agent-name { flex: 1; font-weight: 500; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text-color); }
+        .agent-name { flex: 1; font-weight: 500; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text-color); }
         .agent-badge { 
             font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 12px; 
             min-width: 20px; text-align: center;
@@ -306,49 +306,49 @@ def generate_html_report(df_agents, df_monthly=None, out_path="reports/dashboard
         [class*="badge-C"] { background: rgba(231, 76, 60, 0.15); color: #c0392b; }
 
         /* Main Content */
-        .main-content { overflow-y: auto; display: flex; flex-direction: column; gap: 60px; padding-right: 5px; }
+        .main-content { overflow-y: auto; display: flex; flex-direction: column; gap: 16px; padding-right: 5px; }
         .main-content::-webkit-scrollbar { width: 6px; }
         .main-content::-webkit-scrollbar-thumb { background: #ccc; border-radius: 3px; }
         
         .card { 
-            background: var(--card-bg); border-radius: 12px; padding: 25px; 
+            background: var(--card-bg); border-radius: 10px; padding: 16px; 
             box-shadow: var(--shadow); border: 1px solid var(--border);
             transition: transform 0.2s, box-shadow 0.2s;
         }
         .card:hover { box-shadow: var(--shadow-hover); }
         
         /* Profile Header */
-        .profile-header { display: flex; justify-content: space-between; margin-bottom: 25px; border-bottom: 1px solid var(--border); padding-bottom: 20px; }
-        .profile-name { font-size: 28px; font-weight: 700; margin: 0 0 5px 0; color: var(--primary); }
-        .profile-id { font-family: monospace; color: var(--text-muted); font-size: 14px; background: #f0f2f5; padding: 2px 6px; border-radius: 4px; }
-        .profile-score-val { font-size: 32px; font-weight: 800; color: var(--primary); letter-spacing: -1px; text-align: right; }
-        .profile-score-lbl { font-size: 12px; color: var(--text-muted); text-transform: uppercase; text-align: right; letter-spacing: 1px; }
+        .profile-header { display: flex; justify-content: space-between; margin-bottom: 12px; border-bottom: 1px solid var(--border); padding-bottom: 10px; }
+        .profile-name { font-size: 22px; font-weight: 700; margin: 0 0 3px 0; color: var(--primary); }
+        .profile-id { font-family: monospace; color: var(--text-muted); font-size: 12px; background: #f0f2f5; padding: 2px 6px; border-radius: 4px; }
+        .profile-score-val { font-size: 26px; font-weight: 800; color: var(--primary); letter-spacing: -1px; text-align: right; }
+        .profile-score-lbl { font-size: 10px; color: var(--text-muted); text-transform: uppercase; text-align: right; letter-spacing: 1px; }
         
         .status-badge { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; }
         .status-safe { background: #d4edda; color: #155724; }
         .status-risky { background: #f8d7da; color: #721c24; }
         
         /* Metrics Grid */
-        .metrics-category { margin-bottom: 25px; }
+        .metrics-category { margin-bottom: 10px; }
         .metrics-title { 
-            font-size: 14px; font-weight: 700; color: var(--text-color); margin-bottom: 12px; 
-            display: flex; align-items: center; gap: 8px;
-            padding-bottom: 8px; border-bottom: 1px dashed var(--border);
+            font-size: 13px; font-weight: 700; color: var(--text-color); margin-bottom: 8px; 
+            display: flex; align-items: center; gap: 6px;
+            padding-bottom: 6px; border-bottom: 1px dashed var(--border);
         }
-        .metrics-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 15px; }
+        .metrics-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
         .metric-box { 
-            background: #fafbfc; padding: 15px 10px; border-radius: 8px; text-align: center; border: 1px solid #eee;
+            background: #fafbfc; padding: 10px 6px; border-radius: 6px; text-align: center; border: 1px solid #eee;
             transition: transform 0.2s;
         }
         .metric-box:hover { transform: translateY(-2px); border-color: var(--accent); }
-        .metric-val { font-size: 18px; font-weight: 700; color: var(--primary); margin-bottom: 4px; }
-        .metric-lbl { font-size: 10px; color: #7f8c8d; text-transform: uppercase; letter-spacing: 0.5px; }
+        .metric-val { font-size: 15px; font-weight: 700; color: var(--primary); margin-bottom: 2px; }
+        .metric-lbl { font-size: 9px; color: #7f8c8d; text-transform: uppercase; letter-spacing: 0.5px; }
         
         /* Charts Area */
         .radar-section {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 24px;
+            gap: 16px;
             margin-bottom: 0;
             align-items: stretch;
         }
@@ -357,25 +357,28 @@ def generate_html_report(df_agents, df_monthly=None, out_path="reports/dashboard
             height: 100%;
             display: flex;
             flex-direction: column;
-            padding: 24px;
+            padding: 14px;
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
         }
 
         .trend-section {
             width: 100%;
             margin-bottom: 0;
+            margin-top: 8px;
+            padding-top: 20px;
+            border-top: 2px solid var(--border);
         }
         
         .chart-title { 
-            font-size: 18px; /* Larger title */
+            font-size: 15px;
             font-weight: 700; 
             letter-spacing: -0.025em;
-            margin-bottom: 20px; 
+            margin-bottom: 8px; 
             color: var(--primary); 
             display: flex; 
             align-items: center; 
-            gap: 12px; 
-            padding-bottom: 12px;
+            gap: 10px; 
+            padding-bottom: 8px;
             border-bottom: 1px solid var(--border);
         }
 
@@ -406,11 +409,16 @@ def generate_html_report(df_agents, df_monthly=None, out_path="reports/dashboard
         .pass { color: var(--success); } .fail { color: var(--text-muted); opacity: 0.6; }
 
         /* Tables */
-        table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 10px; }
-        th, td { padding: 10px; text-align: left; border-bottom: 1px solid #eee; }
-        th { font-weight: 600; color: var(--text-muted); text-transform: uppercase; font-size: 11px; background: #fafbfc; }
+        /* Tables */
+        table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 13px; margin-top: 10px; }
+        th, td { padding: 12px 15px; text-align: left; border-bottom: 1px solid #e2e8f0; }
+        th { 
+            font-weight: 600; color: var(--text-muted); text-transform: uppercase; font-size: 11px; 
+            background: #f8fafc; position: sticky; top: 0; z-index: 10; letter-spacing: 0.5px;
+        }
+        tbody tr:hover { background-color: #f8fafc; transition: background 0.15s; }
         tr:last-child td { border-bottom: none; }
-        .num-col { text-align: right; font-family: monospace; }
+        .num-col { text-align: right; font-family: 'Inter', monospace; font-variant-numeric: tabular-nums; }
         
         /* Responsive */
         @media (max-width: 1200px) { 
@@ -482,6 +490,35 @@ def generate_html_report(df_agents, df_monthly=None, out_path="reports/dashboard
         .ms-option-rank { color: var(--text-muted); font-size: 11px; min-width: 28px; }
         .ms-option-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .ms-color-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+        
+        /* Info Icon & Tooltip */
+        .info-icon {
+            display: inline-flex; align-items: center; justify-content: center;
+            width: 16px; height: 16px; border-radius: 50%;
+            background: #e2e8f0; color: #64748b;
+            font-size: 11px; font-weight: bold; cursor: help;
+            margin-left: 8px; position: relative;
+            border: 1px solid #cbd5e1;
+        }
+        .info-icon:hover { background: #cbd5e1; color: #334155; }
+
+        .info-icon .tooltip-text {
+            visibility: hidden; width: 220px;
+            background-color: #1e293b; color: #fff;
+            text-align: left; border-radius: 6px; padding: 8px 10px;
+            position: absolute; z-index: 100;
+            bottom: 125%; left: 50%; margin-left: -110px;
+            font-size: 11px; font-weight: 400; line-height: 1.4;
+            opacity: 0; transition: opacity 0.2s;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06);
+            pointer-events: none;
+        }
+        .info-icon .tooltip-text::after {
+            content: ""; position: absolute; top: 100%; left: 50%;
+            margin-left: -5px; border-width: 5px; border-style: solid;
+            border-color: #1e293b transparent transparent transparent;
+        }
+        .info-icon:hover .tooltip-text { visibility: visible; opacity: 1; }
     </style>
 </head>
 <body>
@@ -577,7 +614,12 @@ def generate_html_report(df_agents, df_monthly=None, out_path="reports/dashboard
                 <div class="chart-title">
                     <span style="font-size:24px; background:var(--bg-color); padding:8px; border-radius:8px;">🕸️</span> 
                     <div style="flex:1;">
-                        <div style="line-height:1.2;">Análisis Radar</div>
+                        <div style="line-height:1.2; display:flex; align-items:center;">
+                            Análisis Radar
+                            <span class="info-icon">! 
+                                <span class="tooltip-text">Comparativa multidimensional del agente frente al promedio del mercado en 10 variables clave (escala 0-10).</span>
+                            </span>
+                        </div>
                         <div style="font-size:12px; color:var(--text-muted); font-weight:400; margin-top:2px;">Perfil vs Promedio Global</div>
                     </div>
                     <div style="display:flex; align-items:center; gap:6px;">
@@ -598,27 +640,39 @@ def generate_html_report(df_agents, df_monthly=None, out_path="reports/dashboard
                     </div>
                 </div>
                 <div class="ms-selected-bar" id="msSelectedBar"></div>
-                <div id="radarChart" style="height: 520px; width: 100%;"></div>
+                <div id="radarChart" style="height: 100%; min-height: 40vh; width: 100%;"></div>
             </div>
             <div class="card">
                 <div class="chart-title">
                     <span style="font-size:24px; background:var(--bg-color); padding:8px; border-radius:8px;">📊</span> 
                     <div>
-                        <div style="line-height:1.2;">Métricas (Porcentaje)</div>
+                        <div style="line-height:1.2; display:flex; align-items:center;">
+                            Desempeño por Indicadores (KPIs)
+                            <span class="info-icon">! 
+                                <span class="tooltip-text">Desglose porcentual de cada métrica con delta comparativo. Muestra fortalezas y áreas donde el agente supera o está por debajo del benchmark.</span>
+                            </span>
+                        </div>
                         <div style="font-size:12px; color:var(--text-muted); font-weight:400; margin-top:2px;">Desglose detallado vs Benchmark</div>
                     </div>
                     <button class="reset-btn" onclick="resetChart('barChart')" title="Reiniciar gráfico" style="margin-left:auto;">
                         ↺
                     </button>
                 </div>
-                <div id="barChart" style="height: 520px; width: 100%;"></div>
+                <div id="barNarrative" style="font-size:12px; padding:4px 12px 0; line-height:1.5; min-height:18px;"></div>
+                <div id="barChart" style="height: 100%; min-height: 40vh; width: 100%;"></div>
             </div>
         </div>
 
         <div class="trend-section">
             <div class="card">
                 <div class="chart-title">
-                    <span style="font-size:20px;">📈</span> Tendencia Histórica
+                    <span style="font-size:20px;">📈</span> 
+                    <span style="display:flex; align-items:center;">
+                        Tendencia Histórica
+                        <span class="info-icon">! 
+                            <span class="tooltip-text">Evolución histórica de volúmenes (depósitos/retiros) y métricas financieras (GGR, comisiones) para identificar patrones de crecimiento o estabilidad.</span>
+                        </span>
+                    </span>
                     <div style="margin-left:auto; display:flex; gap:5px;">
                         <select id="metricSelect" onchange="updateTrendChart()" style="padding:5px; border-radius:4px; border:1px solid #ddd; font-size:12px;">
                             <option value="total_depositos">Depósitos</option>
@@ -634,13 +688,20 @@ def generate_html_report(df_agents, df_monthly=None, out_path="reports/dashboard
                         </button>
                     </div>
                 </div>
-                <div id="trendChart" style="height: 450px;"></div>
+                <div id="trendChart" style="height: 100%; min-height: 40vh; width: 100%;"></div>
             </div>
         </div>
         
         <!-- Monthly Table -->
         <div class="card">
-            <div class="chart-title">📅 Detalle Mensual</div>
+            <div class="chart-title">
+                <span style="display:flex; align-items:center;">
+                    📅 Detalle Mensual
+                    <span class="info-icon">! 
+                        <span class="tooltip-text">Tabla detallada con los valores mensuales de depósitos, retiros, GGR, NGR y comisiones generadas.</span>
+                    </span>
+                </span>
+            </div>
             <div style="overflow-x: auto;">
                 <table>
                     <thead>
@@ -660,7 +721,14 @@ def generate_html_report(df_agents, df_monthly=None, out_path="reports/dashboard
         
         <!-- Similarity Analysis -->
         <div class="card">
-            <div class="chart-title">🎯 Análisis de Mejora (Próximo Nivel)</div>
+            <div class="chart-title">
+                <span style="display:flex; align-items:center;">
+                    🎯 Análisis de Mejora (Próximo Nivel)
+                    <span class="info-icon">! 
+                        <span class="tooltip-text">Identificación automática de las 3 métricas con mayor brecha respecto al siguiente nivel de clasificación, sugiriendo áreas prioritarias de enfoque.</span>
+                    </span>
+                </span>
+            </div>
             <div id="simContent" style="display:none;">
                 <div style="display:flex; gap:20px; align-items:center; margin-bottom:15px;">
                     <div>
@@ -868,6 +936,7 @@ def generate_html_report(df_agents, df_monthly=None, out_path="reports/dashboard
         renderCompareTags();
         updateCompareCheckboxes();
         updateRadarChart();
+        updateTrendChart();
     }
 
     function clearCompareSelection() {
@@ -875,6 +944,7 @@ def generate_html_report(df_agents, df_monthly=None, out_path="reports/dashboard
         renderCompareTags();
         updateCompareCheckboxes();
         updateRadarChart();
+        updateTrendChart();
     }
 
     function renderCompareTags() {
@@ -1231,28 +1301,35 @@ def generate_html_report(df_agents, df_monthly=None, out_path="reports/dashboard
         });
         
         // --- RADAR DATA ---
+        // Close the polygon by repeating the first point
+        const radarMetrics = [...metrics, metrics[0]];
+        const radarValAvg = [...valAvg, valAvg[0]];
+        const radarValA = [...valA, valA[0]];
+        
         const radarData = [
             {
                 type: 'scatterpolar',
-                r: valAvg,
-                theta: metrics,
+                r: radarValAvg,
+                theta: radarMetrics,
                 fill: 'toself',
                 name: `Promedio Global (${validAgents.length} agentes)`,
                 line: {color: '#94a3b8', width: 1.5, dash: 'dot'},
-                fillcolor: 'rgba(148, 163, 184, 0.1)',
+                marker: {size: 4, color: '#94a3b8'},
+                fillcolor: 'rgba(148, 163, 184, 0.12)',
                 hoverinfo: 'text',
-                text: valAvg.map((v, i) => `${metrics[i]}: ${v.toFixed(1)}`)
+                text: radarValAvg.map((v, i) => `${radarMetrics[i]}: ${v.toFixed(1)}`)
             },
             {
                 type: 'scatterpolar',
-                r: valA,
-                theta: metrics,
+                r: radarValA,
+                theta: radarMetrics,
                 fill: 'toself',
                 name: a.nombre_usuario_agente || 'Seleccionado',
-                line: {color: '#2563eb', width: 2.5},
-                fillcolor: 'rgba(37, 99, 235, 0.15)',
+                line: {color: '#2563eb', width: 3},
+                marker: {size: 6, color: '#2563eb', line: {color: 'white', width: 1.5}},
+                fillcolor: 'rgba(37, 99, 235, 0.25)',
                 hoverinfo: 'text',
-                text: valA.map((v, i) => `${metrics[i]}: ${v.toFixed(1)}`),
+                text: radarValA.map((v, i) => `${radarMetrics[i]}: ${v.toFixed(1)}`),
                 showlegend: false
             }
         ];
@@ -1292,6 +1369,9 @@ def generate_html_report(df_agents, df_monthly=None, out_path="reports/dashboard
         if (topStrengths.length > 0 && topPriorities.length > 0) narrativeText += "  |  ";
         if (topPriorities.length > 0) narrativeText += `<span style='color:#dc2626'><b>Prioridades:</b> ${topPriorities.join(', ')}</span>`;
         if (!narrativeText) narrativeText = "Desempeño alineado con Benchmark";
+        // Render narrative into HTML div
+        const barNarrDiv = document.getElementById('barNarrative');
+        if (barNarrDiv) barNarrDiv.innerHTML = narrativeText;
         // Exclude currently selected agent from compare list
         const compareIds = selectedCompareIds.filter(id => id != a.id_agente);
         
@@ -1312,22 +1392,14 @@ def generate_html_report(df_agents, df_monthly=None, out_path="reports/dashboard
                 showlegend: false
             });
 
-            // Trace 2: Agent bars with performance-based colors
-            const barColors = sortedDiff.map(d => {
-                if (d >= 20) return '#059669';      // Excellent: deep green
-                if (d >= 5)  return '#10b981';       // Good: emerald
-                if (d >= 0)  return '#2563eb';       // At benchmark: blue
-                if (d >= -10) return '#f59e0b';      // Below: amber
-                return '#ef4444';                     // Poor: red
-            });
-            
+            // Trace 2: Agent bars (uniform blue)
             barData.push({
                 y: sortedMetrics,
                 x: sortedValA,
                 type: 'bar',
                 orientation: 'h',
                 name: a.nombre_usuario_agente || 'Seleccionado',
-                marker: { color: barColors, cornerradius: 4 },
+                marker: { color: '#2563eb', cornerradius: 4 },
                 text: sortedValA.map(v => v >= 8 ? v.toFixed(1) + '%' : ''),
                 textposition: 'inside',
                 insidetextanchor: 'end',
@@ -1359,7 +1431,7 @@ def generate_html_report(df_agents, df_monthly=None, out_path="reports/dashboard
 
             barData.push({
                 y: sortedMetrics,
-                x: sortedMetrics.map(() => 112),
+                x: sortedMetrics.map(() => 122),
                 type: 'scatter',
                 mode: 'text',
                 text: deltaText,
@@ -1431,18 +1503,19 @@ def generate_html_report(df_agents, df_monthly=None, out_path="reports/dashboard
             if (!compAgent) return;
             const color = compareColors[selectedCompareIds.indexOf(compId) % compareColors.length];
             const valComp = metricKeys.map(k => s(compAgent, k));
+            const radarValComp = [...valComp, valComp[0]];
 
             // Add to Radar (no legend — tags are shown above)
             radarData.push({
                 type: 'scatterpolar',
-                r: valComp,
-                theta: metrics,
+                r: radarValComp,
+                theta: radarMetrics,
                 fill: 'toself',
                 name: compAgent.nombre_usuario_agente || 'Comparado',
                 line: {color: color, width: 2},
                 fillcolor: hexToRgba(color, 0.15),
                 hoverinfo: 'text',
-                text: valComp.map((v, i) => `${metrics[i]}: ${v.toFixed(1)}`),
+                text: radarValComp.map((v, i) => `${radarMetrics[i]}: ${v.toFixed(1)}`),
                 showlegend: false
             });
         });
@@ -1462,31 +1535,24 @@ def generate_html_report(df_agents, df_monthly=None, out_path="reports/dashboard
         const radarLayout = {
             polar: {
                 radialaxis: { visible: true, range: [0, 10], showticklabels: false, ticks: '' },
-                angularaxis: { tickfont: { size: 11, color: '#64748b', family: 'Inter, sans-serif' } }
+                angularaxis: { tickfont: { size: 11, color: '#64748b', family: 'Inter, sans-serif' } },
+                gridshape: 'linear'
             },
-            margin: { t: 30, b: 30, l: 50, r: 50 },
+            margin: { t: 20, b: 25, l: 35, r: 35 },
             showlegend: true,
-            legend: { orientation: 'h', y: -0.05, xanchor: 'center', x: 0.5, font: { size: 11, color: '#94a3b8' } },
+            legend: { orientation: 'h', y: -0.02, xanchor: 'center', x: 0.5, font: { size: 10, color: '#94a3b8' } },
             paper_bgcolor: 'rgba(0,0,0,0)',
             plot_bgcolor: 'rgba(0,0,0,0)',
             transition: { duration: 300, easing: 'cubic-in-out' },
-            height: 520
+            transition: { duration: 300, easing: 'cubic-in-out' }
+            // height removed to let it be responsive
         };
 
         const barLayout = {
-            title: {
-                text: hasCompare ? '' : narrativeText,
-                x: 0,
-                y: 0.98,
-                xanchor: 'left',
-                yanchor: 'top',
-                font: { family: 'Inter', size: 12, color: '#0f172a' },
-                pad: { b: 8 }
-            },
-            margin: { t: hasCompare ? 20 : 50, b: 20, l: 130, r: hasCompare ? 20 : 70 }, 
+            margin: { t: 15, b: 20, l: 130, r: hasCompare ? 20 : 70 }, 
             barmode: hasCompare ? 'group' : 'overlay',
             xaxis: { 
-                range: [0, hasCompare ? 105 : 130], 
+                range: [0, hasCompare ? 105 : 140], 
                 showgrid: hasCompare, 
                 gridcolor: '#f1f5f9',
                 zeroline: false, 
@@ -1504,7 +1570,8 @@ def generate_html_report(df_agents, df_monthly=None, out_path="reports/dashboard
             shapes: shapes,
             paper_bgcolor: 'rgba(0,0,0,0)',
             plot_bgcolor: 'rgba(0,0,0,0)',
-            height: 520,
+            plot_bgcolor: 'rgba(0,0,0,0)',
+            // height removed
             showlegend: false,
             bargap: hasCompare ? 0.25 : 0.4,
             bargroupgap: hasCompare ? 0.08 : 0
@@ -1581,82 +1648,96 @@ def generate_html_report(df_agents, df_monthly=None, out_path="reports/dashboard
              const x_vals = series.map(d => d.month);
              const y_vals = series.map(d => d[metricKey] || 0);
              
+             // Determine if in multi-agent mode
+             const activeItem2 = document.querySelector('.agent-item.active');
+             const activeId2 = activeItem2 ? parseInt(activeItem2.dataset.id) : null;
+             const compareIds = selectedCompareIds.filter(cid => cid != activeId2);
+             const isMulti = compareIds.length > 0;
+             const agentName = a.nombre_usuario_agente || 'Seleccionado';
+
              data.push({
                  x: x_vals,
                  y: y_vals,
                  type: 'scatter',
-                mode: 'lines+markers',
-                name: metricName,
-                line: {color: '#60a5fa', shape: 'spline', width: 3},
-                marker: {size: 8, color: '#2563eb', line: {color: 'white', width: 2}},
-                hovertemplate: '<b>%{x}</b><br>' + metricName + ': %{y:,.2f}<extra></extra>'
-            });
-             
-             // Linear Regression
-             if (series.length > 1) {
+                 mode: 'lines+markers',
+                 name: isMulti ? agentName : metricName,
+                 line: {color: '#2563eb', shape: 'spline', width: isMulti ? 3.5 : 3},
+                 marker: {size: isMulti ? 7 : 8, color: '#2563eb', line: {color: 'white', width: 2}},
+                 fill: isMulti ? 'tozeroy' : 'none',
+                 fillcolor: 'rgba(37, 99, 235, 0.08)',
+                 hovertemplate: '<b>%{x}</b><br>' + (isMulti ? agentName : metricName) + ': %{y:,.2f}<extra></extra>',
+                 showlegend: !isMulti
+             });
+              
+             // Linear Regression - only in single agent mode
+             if (series.length > 1 && !isMulti) {
                  const x_nums = x_vals.map((_, i) => i);
-                 
-                 // Calculate linear regression
                  const n = y_vals.length;
                  let sumX = 0, sumY = 0, sumXY = 0, sumXX = 0;
                  for (let i = 0; i < n; i++) {
-                     sumX += x_nums[i];
-                     sumY += y_vals[i];
-                     sumXY += x_nums[i] * y_vals[i];
-                     sumXX += x_nums[i] * x_nums[i];
+                     sumX += x_nums[i]; sumY += y_vals[i];
+                     sumXY += x_nums[i] * y_vals[i]; sumXX += x_nums[i] * x_nums[i];
                  }
-                 const m = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX);
-                 const b = (sumY - m * sumX) / n;
-                 
-                 const trend_y = x_nums.map(x => m * x + b);
-                 
-                 // Determine trend color
-                 const start_y = trend_y[0];
-                 const end_y = trend_y[trend_y.length - 1];
+                 const m2 = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX);
+                 const b2 = (sumY - m2 * sumX) / n;
+                 const trend_y = x_nums.map(x => m2 * x + b2);
                  const mean_y = sumY / n;
-                 
-                 let trendColor = '#94a3b8'; 
-                 const total_change = end_y - start_y;
+                 let trendColor = '#94a3b8';
+                 const total_change = trend_y[trend_y.length - 1] - trend_y[0];
                  const rel_change = mean_y !== 0 ? total_change / Math.abs(mean_y) : 0;
-                 
                  if (Math.abs(rel_change) < 0.05) trendColor = '#94a3b8';
-                 else if (m > 0) trendColor = '#4ade80';
+                 else if (m2 > 0) trendColor = '#4ade80';
                  else trendColor = '#f87171';
-                 
                  data.push({
-                     x: x_vals,
-                     y: trend_y,
-                     type: 'scatter',
-                     mode: 'lines',
-                     name: `Tendencia (${m > 0 ? '↗' : (m < 0 ? '↘' : '→')})`,
-                     line: {color: trendColor, width: 2, dash: 'dash'},
-                     hoverinfo: 'skip'
+                     x: x_vals, y: trend_y, type: 'scatter', mode: 'lines',
+                     name: `Tendencia (${m2 > 0 ? '\u2197' : (m2 < 0 ? '\u2198' : '\u2192')})`,
+                     line: {color: trendColor, width: 2, dash: 'dash'}, hoverinfo: 'skip'
                  });
              }
-             
+              
+             // === Multi-agent comparison traces ===
+             compareIds.forEach((compId, idx) => {
+                 const compIdStr = compId.toString();
+                 if (!monthlyData || !monthlyData[compIdStr]) return;
+                 const compAgent = displayedAgents.find(x => x.id_agente == compId) || allAgents.find(x => x.id_agente == compId);
+                 if (!compAgent) return;
+                 const color = compareColors[selectedCompareIds.indexOf(compId) % compareColors.length];
+                 let compSeries = [...monthlyData[compIdStr]];
+                 compSeries.sort((s1, s2) => s1.month.localeCompare(s2.month));
+                 const comp_x = compSeries.map(d => d.month);
+                 const comp_y = compSeries.map(d => d[metricKey] || 0);
+                 const compName = compAgent.nombre_usuario_agente || compIdStr;
+                 data.push({
+                     x: comp_x, y: comp_y, type: 'scatter', mode: 'lines+markers',
+                     name: compName,
+                     line: { color: color, shape: 'spline', width: 2.5 },
+                     marker: { size: 5, color: color, line: { color: 'white', width: 1.5 } },
+                     fill: 'tozeroy',
+                     fillcolor: hexToRgba(color, 0.05),
+                     hovertemplate: '<b>%{x}</b><br>' + compName + ': %{y:,.2f}<extra></extra>',
+                     showlegend: false
+                 });
+             });
+              
              layout = {
-               margin: { t: 30, b: 40, l: 50, r: 20 },
-               xaxis: { 
-                   showgrid: false,
-                   rangeslider: { 
-                       visible: true, 
-                       thickness: 0.08,
-                       bgcolor: '#fcfdfe',
-                       bordercolor: '#f1f5f9',
-                       borderwidth: 1
-                   },
-                   type: 'date',
-                   tickformat: '%b %Y',
-                   automargin: true,
-                   fixedrange: false
-               },
-               yaxis: { showgrid: true, gridcolor: '#f1f5f9', zeroline: false, fixedrange: false },
-                paper_bgcolor: 'rgba(0,0,0,0)',
-                plot_bgcolor: 'rgba(0,0,0,0)',
+                margin: { t: isMulti ? 15 : 30, b: 40, l: 55, r: 20 },
+                xaxis: {
+                    showgrid: false,
+                    rangeslider: { visible: !isMulti, thickness: 0.08, bgcolor: '#fcfdfe', bordercolor: '#f1f5f9', borderwidth: 1 },
+                    type: 'date', tickformat: '%b %Y',
+                    tickfont: { size: 11, color: '#64748b', family: 'Inter' },
+                    automargin: true, fixedrange: false
+                },
+                yaxis: { showgrid: true, gridcolor: '#f1f5f9', zeroline: false, fixedrange: false,
+                    tickfont: { size: 10, color: '#94a3b8', family: 'Inter' } },
+                paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)',
                 hovermode: 'x unified',
-                legend: { orientation: 'h', y: 1.1 },
+                legend: { orientation: 'h', y: 1.1, font: { size: 11, color: '#64748b', family: 'Inter' } },
+                showlegend: !isMulti,
                 dragmode: 'zoom',
-                transition: { duration: 300, easing: 'cubic-in-out' }
+                dragmode: 'zoom',
+                transition: { duration: 300, easing: 'cubic-in-out' },
+                hoverlabel: { bgcolor: "rgba(255, 255, 255, 0.95)", bordercolor: "#e2e8f0", font: { family: "Inter", size: 12, color: "#1e293b" } }
             };
              
         } else {
