@@ -1307,18 +1307,19 @@ def generate_html_report(df_agents, df_monthly=None, out_path="reports/dashboard
         const radarValA = [...valA, valA[0]];
         
         const radarData = [
+            /* Benchmark removed for cleaner UI
             {
                 type: 'scatterpolar',
                 r: radarValAvg,
                 theta: radarMetrics,
                 fill: 'toself',
                 name: `Promedio Global (${validAgents.length} agentes)`,
-                line: {color: '#94a3b8', width: 1.5, dash: 'dot'},
+                line: {color: '#94a3b8', width: 0, dash: 'dot'},
                 marker: {size: 4, color: '#94a3b8'},
                 fillcolor: 'rgba(148, 163, 184, 0.12)',
                 hoverinfo: 'text',
                 text: radarValAvg.map((v, i) => `${radarMetrics[i]}: ${v.toFixed(1)}`)
-            },
+            }, */
             {
                 type: 'scatterpolar',
                 r: radarValA,
@@ -1382,7 +1383,8 @@ def generate_html_report(df_agents, df_monthly=None, out_path="reports/dashboard
             // ===== SINGLE AGENT VIEW: Performance-gradient bars =====
             
             // Trace 1: Background Track (subtle)
-            barData.push({
+            // Trace 1: Background Track (Removed)
+            /* barData.push({
                 y: sortedMetrics,
                 x: sortedMetrics.map(() => 100),
                 type: 'bar',
@@ -1390,7 +1392,7 @@ def generate_html_report(df_agents, df_monthly=None, out_path="reports/dashboard
                 marker: { color: '#f1f5f9', line: { width: 0 }, cornerradius: 4 },
                 hoverinfo: 'skip',
                 showlegend: false
-            });
+            }); */
 
             // Trace 2: Agent bars (uniform blue)
             barData.push({
@@ -1522,6 +1524,7 @@ def generate_html_report(df_agents, df_monthly=None, out_path="reports/dashboard
 
         // Shapes for Benchmark Lines
         const shapes = [];
+        /* Benchmark lines removed to clean up UI
         sortedValTop.forEach((val, i) => {
             shapes.push({
                 type: 'line',
@@ -1530,7 +1533,7 @@ def generate_html_report(df_agents, df_monthly=None, out_path="reports/dashboard
                 xref: 'x', yref: 'y',
                 line: { color: '#94a3b8', width: 2, dash: 'dot' }
             });
-        });
+        }); */
 
         const radarLayout = {
             polar: {
@@ -1538,12 +1541,11 @@ def generate_html_report(df_agents, df_monthly=None, out_path="reports/dashboard
                 angularaxis: { tickfont: { size: 11, color: '#64748b', family: 'Inter, sans-serif' } },
                 gridshape: 'linear'
             },
-            margin: { t: 20, b: 25, l: 35, r: 35 },
+            margin: { t: 20, b: 45, l: 35, r: 35 },
             showlegend: true,
-            legend: { orientation: 'h', y: -0.02, xanchor: 'center', x: 0.5, font: { size: 10, color: '#94a3b8' } },
+            legend: { orientation: 'h', y: -0.1, xanchor: 'center', x: 0.5, font: { size: 10, color: '#94a3b8' }, bgcolor: 'rgba(0,0,0,0)' },
             paper_bgcolor: 'rgba(0,0,0,0)',
             plot_bgcolor: 'rgba(0,0,0,0)',
-            transition: { duration: 300, easing: 'cubic-in-out' },
             transition: { duration: 300, easing: 'cubic-in-out' }
             // height removed to let it be responsive
         };
