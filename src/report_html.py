@@ -51,7 +51,8 @@ def calculate_similarity(row, centroids, class_order, metrics):
     except:
         return None
 
-def generate_html_report(df_agents, df_monthly=None, out_path="reports/dashboard.html"):
+
+def generate_html_report(df_agents, df_monthly=None, df_retention=None, df_growth=None, out_path="reports/dashboard.html"):
     """
     Genera un dashboard HTML autocontenido con los resultados de la clasificación.
     """
@@ -92,9 +93,9 @@ def generate_html_report(df_agents, df_monthly=None, out_path="reports/dashboard
     
     # Calculate Centroids for Similarity Analysis
     metrics_for_sim = [
-        'Vi', 'Tx_i', 'Gi', 'Si', 
-        'Punt_Crecimiento', 'Conv_i', 'Punt_Pareto', 
-        'Freq_i', 'Punt_Productos', 'Ti'
+        'rentabilidad', 'volumen', 'fidelidad', 'estabilidad', 
+        'crecimiento', 'eficiencia_casino', 'eficiencia_deportes', 
+        'eficiencia_conversion', 'tendencia', 'diversificacion', 'calidad_jugadores'
     ]
     # Ensure all exist
     for m in metrics_for_sim:
@@ -117,22 +118,19 @@ def generate_html_report(df_agents, df_monthly=None, out_path="reports/dashboard
     metrics_json = json.dumps(metrics_for_sim)
     class_order_json = json.dumps(class_order)
     
-    # Monthly Data for Trend Lines (Optional)
+    # Monthly Data for Trend Lines
     monthly_data_js = "null"
-    if df_monthly is not None:
+    if df_monthly is not None and not df_monthly.empty:
         # Group by agent and convert to dict {agent_id: [{month, comision, depositos, ...}, ...]}
-        # Include more metrics for detailed visualization
         monthly_cols = [
             'id_agente', 'month', 'calculo_comision', 'total_depositos', 'active_players', 'total_retiros', 'calculo_ggr',
             'ggr_deportiva', 'ggr_casino', 'total_apuesta_deportiva', 'total_apuesta_casino', 'calculo_ngr',
-            # Scores mapped to internal names
-            'score_global', 'Si', 'Vi', 'Gi', 'Ti', 'Tx_i', 'Freq_i', 'Conv_i',
-            # Unmapped new scores
-            'Punt_Crecimiento', 'Punt_Pareto', 'Punt_Productos', 'Punt_Rotación',
-            # Metadata
+            'score_global', 
+            'rentabilidad', 'volumen', 'fidelidad', 'estabilidad', 
+            'crecimiento', 'eficiencia_casino', 'eficiencia_deportes', 
+            'eficiencia_conversion', 'tendencia', 'diversificacion', 'calidad_jugadores',
             'Clase', 'Risk_Safe'
         ]
-        # Check if columns exist
         available_cols = [c for c in monthly_cols if c in df_monthly.columns]
         
         monthly_min = df_monthly[available_cols].copy()
@@ -141,6 +139,23 @@ def generate_html_report(df_agents, df_monthly=None, out_path="reports/dashboard
         for agent_id, group in monthly_min.groupby('id_agente'):
             monthly_dict[str(agent_id)] = group.drop(columns=['id_agente']).to_dict(orient='records')
         monthly_data_js = json.dumps(monthly_dict)
+
+    # Retention Data
+    retention_json = "null"
+    if df_retention is not None and not df_retention.empty:
+        ret_dict = {}
+        for agent_id, group in df_retention.groupby('id_agente'):
+            ret_dict[str(agent_id)] = group.drop(columns=['id_agente']).to_dict(orient='records')
+        retention_json = json.dumps(ret_dict)
+
+    # Growth Data
+    growth_json = "null"
+    if df_growth is not None and not df_growth.empty:
+        growth_dict = {}
+        for agent_id, group in df_growth.groupby('id_agente'):
+            growth_dict[str(agent_id)] = group.drop(columns=['id_agente']).to_dict(orient='records')
+        growth_json = json.dumps(growth_dict)
+
 
     # 2. Plantilla HTML (Jinja2)
     
@@ -594,16 +609,17 @@ def generate_html_report(df_agents, df_monthly=None, out_path="reports/dashboard
             <div class="metrics-category" style="margin-bottom:0;">
                 <h3 class="metrics-title">⚙️ Indicadores de Rendimiento</h3>
                 <div class="metrics-grid">
-                    <div class="metric-box"><div class="metric-val" id="valSi">-</div><div class="metric-lbl">Estabilidad</div></div>
-                    <div class="metric-box"><div class="metric-val" id="valVi">-</div><div class="metric-lbl">Rentabilidad</div></div>
-                    <div class="metric-box"><div class="metric-val" id="valGi">-</div><div class="metric-lbl">Fidelidad</div></div>
-                    <div class="metric-box"><div class="metric-val" id="valTi">-</div><div class="metric-lbl">Tendencia</div></div>
-                    <div class="metric-box"><div class="metric-val" id="valTx">-</div><div class="metric-lbl">Volumen</div></div>
-                    <div class="metric-box"><div class="metric-val" id="valConv">-</div><div class="metric-lbl">Conversión</div></div>
+                    <div class="metric-box"><div class="metric-val" id="valRen">-</div><div class="metric-lbl">Rentabilidad</div></div>
+                    <div class="metric-box"><div class="metric-val" id="valVol">-</div><div class="metric-lbl">Volumen</div></div>
+                    <div class="metric-box"><div class="metric-val" id="valFid">-</div><div class="metric-lbl">Fidelidad</div></div>
+                    <div class="metric-box"><div class="metric-val" id="valEst">-</div><div class="metric-lbl">Estabilidad</div></div>
                     <div class="metric-box"><div class="metric-val" id="valCre">-</div><div class="metric-lbl">Crecimiento</div></div>
-                    <div class="metric-box"><div class="metric-val" id="valPar">-</div><div class="metric-lbl">Pareto</div></div>
-                    <div class="metric-box"><div class="metric-val" id="valRot">-</div><div class="metric-lbl">Rotación</div></div>
-                    <div class="metric-box"><div class="metric-val" id="valProd">-</div><div class="metric-lbl">Productos</div></div>
+                    <div class="metric-box"><div class="metric-val" id="valCas">-</div><div class="metric-lbl">Efic. Casino</div></div>
+                    <div class="metric-box"><div class="metric-val" id="valDep">-</div><div class="metric-lbl">Efic. Deportes</div></div>
+                    <div class="metric-box"><div class="metric-val" id="valConv">-</div><div class="metric-lbl">Conversión</div></div>
+                    <div class="metric-box"><div class="metric-val" id="valTen">-</div><div class="metric-lbl">Tendencia</div></div>
+                    <div class="metric-box"><div class="metric-val" id="valDiv">-</div><div class="metric-lbl">Diversificación</div></div>
+                    <div class="metric-box"><div class="metric-val" id="valCal">-</div><div class="metric-lbl">Calidad</div></div>
                 </div>
             </div>
         </div>
@@ -692,6 +708,40 @@ def generate_html_report(df_agents, df_monthly=None, out_path="reports/dashboard
             </div>
         </div>
         
+        <!-- Deep Analysis Charts -->
+        <div class="radar-section"> <!-- Reusing grid layout -->
+            <div class="card">
+                <div class="chart-title">
+                    <span style="font-size:20px;">👥</span> 
+                    <span style="display:flex; align-items:center;">
+                        Retención (Cohortes)
+                        <span class="info-icon">! 
+                            <span class="tooltip-text">Porcentaje de jugadores de cada cohorte mensual que regresan en meses subsiguientes.</span>
+                        </span>
+                    </span>
+                     <button class="reset-btn" onclick="resetChart('retentionChart')" title="Reiniciar gráfico" style="margin-left:auto;">
+                        ↺
+                    </button>
+                </div>
+                <div id="retentionChart" style="height: 100%; min-height: 40vh; width: 100%;"></div>
+            </div>
+            <div class="card">
+                <div class="chart-title">
+                    <span style="font-size:20px;">🌱</span> 
+                    <span style="display:flex; align-items:center;">
+                        Crecimiento Orgánico
+                        <span class="info-icon">! 
+                            <span class="tooltip-text">Desglose mensual de jugadores activos por tipo: Nuevos (primera vez), Recurrentes (mes anterior) y Resucitados (inactivos que vuelven).</span>
+                        </span>
+                    </span>
+                    <button class="reset-btn" onclick="resetChart('growthChart')" title="Reiniciar gráfico" style="margin-left:auto;">
+                        ↺
+                    </button>
+                </div>
+                <div id="growthChart" style="height: 100%; min-height: 40vh; width: 100%;"></div>
+            </div>
+        </div>
+
         <!-- Monthly Table -->
         <div class="card">
             <div class="chart-title">
@@ -766,6 +816,8 @@ def generate_html_report(df_agents, df_monthly=None, out_path="reports/dashboard
     let staticTopAgent = {{ top_agent_json | safe }};
     
     const monthlyData = {{ monthly_json | safe }}; 
+    const retentionData = {{ retention_json | safe }};
+    const growthData = {{ growth_json | safe }};
     
     const listEl = document.getElementById('agentList');
     let currentFilter = 'all';
@@ -1070,16 +1122,10 @@ def generate_html_report(df_agents, df_monthly=None, out_path="reports/dashboard
             }
             
             // Aggregate
-            // Sums
+            // Sums (Keep dynamic sums for financial totals)
             const sums = {
                 total_depositos: 0, total_retiros: 0, 
                 calculo_ggr: 0, calculo_ngr: 0, calculo_comision: 0
-            };
-            // Averages
-            const avgs = {
-                score_global: [], Si: [], Vi: [], Gi: [], Ti: [], 
-                Tx_i: [], Freq_i: [], Conv_i: [],
-                Punt_Crecimiento: [], Punt_Pareto: [], Punt_Productos: []
             };
             
             rangeData.forEach(d => {
@@ -1088,41 +1134,11 @@ def generate_html_report(df_agents, df_monthly=None, out_path="reports/dashboard
                 sums.calculo_ggr += (d.calculo_ggr || 0);
                 sums.calculo_ngr += (d.calculo_ngr || 0);
                 sums.calculo_comision += (d.calculo_comision || 0);
-                
-                if(d.score_global !== undefined) avgs.score_global.push(d.score_global);
-                if(d.Si !== undefined) avgs.Si.push(d.Si);
-                if(d.Vi !== undefined) avgs.Vi.push(d.Vi);
-                if(d.Gi !== undefined) avgs.Gi.push(d.Gi);
-                if(d.Ti !== undefined) avgs.Ti.push(d.Ti);
-                if(d.Tx_i !== undefined) avgs.Tx_i.push(d.Tx_i);
-                if(d.Freq_i !== undefined) avgs.Freq_i.push(d.Freq_i);
-                if(d.Conv_i !== undefined) avgs.Conv_i.push(d.Conv_i);
-                if(d.Punt_Crecimiento !== undefined) avgs.Punt_Crecimiento.push(d.Punt_Crecimiento);
-                if(d.Punt_Pareto !== undefined) avgs.Punt_Pareto.push(d.Punt_Pareto);
-                if(d.Punt_Productos !== undefined) avgs.Punt_Productos.push(d.Punt_Productos);
             });
             
+            // --- FIX: Use static metrics from Python backend instead of re-calculating from missing monthly columns ---
+            // The following metrics are calculated on the full history in backend and are not present in monthlyData
             const result = { ...agent, ...sums, _noData: false };
-            
-            // Update Class/Risk from last month of range
-            if(rangeData.length > 0) {
-                 const last = rangeData[rangeData.length - 1];
-                 if(last.Clase) {
-                     result.Clase = last.Clase;
-                     // Simple Risk Logic: A/B = Safe (1), others = Risky (0)
-                     const isSafe = result.Clase.startsWith('A') || result.Clase.startsWith('B');
-                     result.Risk_Safe = isSafe ? 1 : 0;
-                 }
-            }
-            
-            // Calc Averages
-            for (const [key, vals] of Object.entries(avgs)) {
-                if (vals.length > 0) {
-                    result[key] = vals.reduce((a, b) => a + b, 0) / vals.length;
-                } else {
-                    result[key] = 0;
-                }
-            }
             
             // Recalculate Dynamic Similarity
             result.sim_data = calculateSimilarityJS(result);
@@ -1249,12 +1265,17 @@ def generate_html_report(df_agents, df_monthly=None, out_path="reports/dashboard
         
         // Metrics
         const fmt1 = (val) => val !== undefined ? val.toFixed(1) : '-';
-        if(document.getElementById('valSi')) document.getElementById('valSi').textContent = fmt1(a.Si);
-        if(document.getElementById('valVi')) document.getElementById('valVi').textContent = fmt1(a.Vi);
-        if(document.getElementById('valGi')) document.getElementById('valGi').textContent = fmt1(a.Gi) + '%';
-        if(document.getElementById('valTi')) document.getElementById('valTi').textContent = fmt1(a.Ti);
-        if(document.getElementById('valTx')) document.getElementById('valTx').textContent = fmt1(a.Tx_i);
-        if(document.getElementById('valConv')) document.getElementById('valConv').textContent = fmt1(a.Conv_i);
+        if(document.getElementById('valRen')) document.getElementById('valRen').textContent = fmt1(a.rentabilidad);
+        if(document.getElementById('valVol')) document.getElementById('valVol').textContent = fmt1(a.volumen);
+        if(document.getElementById('valFid')) document.getElementById('valFid').textContent = fmt1(a.fidelidad);
+        if(document.getElementById('valEst')) document.getElementById('valEst').textContent = fmt1(a.estabilidad);
+        if(document.getElementById('valCre')) document.getElementById('valCre').textContent = fmt1(a.crecimiento);
+        if(document.getElementById('valCas')) document.getElementById('valCas').textContent = fmt1(a.eficiencia_casino);
+        if(document.getElementById('valDepScore')) document.getElementById('valDepScore').textContent = fmt1(a.eficiencia_deportes); // Changed ID to avoid conflict with financial 'valDep'
+        if(document.getElementById('valConv')) document.getElementById('valConv').textContent = fmt1(a.eficiencia_conversion);
+        if(document.getElementById('valTen')) document.getElementById('valTen').textContent = fmt1(a.tendencia);
+        if(document.getElementById('valDiv')) document.getElementById('valDiv').textContent = fmt1(a.diversificacion);
+        if(document.getElementById('valCal')) document.getElementById('valCal').textContent = fmt1(a.calidad_jugadores);
         
         // Financials
         const fmt = new Intl.NumberFormat('en-US', { notation: "compact" });
@@ -1263,11 +1284,6 @@ def generate_html_report(df_agents, df_monthly=None, out_path="reports/dashboard
         if(document.getElementById('valGGR')) document.getElementById('valGGR').textContent = fmt.format(a.calculo_ggr || 0);
         if(document.getElementById('valNGR')) document.getElementById('valNGR').textContent = fmt.format(a.calculo_ngr || 0);
         if(document.getElementById('valCom')) document.getElementById('valCom').textContent = fmt.format(a.calculo_comision || 0);
-        
-        if(document.getElementById('valCre')) document.getElementById('valCre').textContent = fmt1(a.Punt_Crecimiento);
-        if(document.getElementById('valPar')) document.getElementById('valPar').textContent = fmt1(a.Punt_Pareto);
-        if(document.getElementById('valRot')) document.getElementById('valRot').textContent = fmt1(a.Freq_i) + '%';
-        if(document.getElementById('valProd')) document.getElementById('valProd').textContent = fmt1(a.Punt_Productos);
 
         renderCompareTags();
         updateRadarChart();
@@ -1278,15 +1294,15 @@ def generate_html_report(df_agents, df_monthly=None, out_path="reports/dashboard
 
     function renderRadar(a) {
         const metrics = [
-            'Rentabilidad (Vi)', 'Volumen (Tx)', 'Fidelidad (Gi)', 'Estabilidad (Si)', 
-            'Crecimiento', 'Eficiencia (Conv)', 'Pareto', 'Rotación (Freq)', 
-            'Productos', 'Tendencia (Ti)'
+            'Rentabilidad', 'Volumen', 'Fidelidad', 'Estabilidad', 
+            'Crecimiento', 'Efic. Casino', 'Efic. Deportes', 'Conversión', 
+            'Tendencia', 'Diversificación', 'Calidad'
         ];
         
         const metricKeys = [
-            'Vi', 'Tx_i', 'Gi', 'Si', 
-            'Punt_Crecimiento', 'Conv_i', 'Punt_Pareto', 
-            'Freq_i', 'Punt_Productos', 'Ti'
+            'rentabilidad', 'volumen', 'fidelidad', 'estabilidad', 
+            'crecimiento', 'eficiencia_casino', 'eficiencia_deportes', 
+            'eficiencia_conversion', 'tendencia', 'diversificacion', 'calidad_jugadores'
         ];
         
         // Calculate average of ALL agents as benchmark
@@ -1764,7 +1780,109 @@ def generate_html_report(df_agents, df_monthly=None, out_path="reports/dashboard
             displaylogo: false
         });
         
+        updateRetentionChart(a);
+        updateGrowthChart(a);
         updateMonthlyTable(a);
+    }
+    
+    function updateRetentionChart(a) {
+        const id = a.id_agente.toString();
+        const divId = 'retentionChart';
+        
+        if(!retentionData || !retentionData[id]) {
+            document.getElementById(divId).innerHTML = '<div style="display:flex;height:100%;align-items:center;justify-content:center;color:#94a3b8;">Sin datos de retención</div>';
+            return;
+        }
+        
+        const series = retentionData[id];
+        // Sort by month
+        series.sort((a, b) => a.mes.localeCompare(b.mes));
+        
+        const x_vals = series.map(d => d.mes);
+        const y_vals = series.map(d => d.tasa_retencion);
+        
+        const data = [{
+            x: x_vals,
+            y: y_vals,
+            type: 'scatter',
+            mode: 'lines+markers',
+            name: 'Retención %',
+            line: {color: '#8b5cf6', width: 3, shape: 'spline'},
+            marker: {size: 8, color: '#8b5cf6', line: {color: 'white', width: 2}},
+            fill: 'tozeroy',
+            fillcolor: 'rgba(139, 92, 246, 0.1)',
+            hovertemplate: '<b>%{x}</b><br>Retención: %{y:.1f}%<extra></extra>'
+        }];
+        
+        const layout = {
+            margin: { t: 20, b: 40, l: 40, r: 20 },
+            xaxis: { 
+                showgrid: false, 
+                tickfont: { size: 11, color: '#64748b' },
+                fixedrange: true
+            },
+            yaxis: { 
+                showgrid: true, 
+                gridcolor: '#f1f5f9', 
+                range: [0, 105],
+                tickfont: { size: 10, color: '#94a3b8' },
+                fixedrange: true
+            },
+            paper_bgcolor: 'rgba(0,0,0,0)',
+            plot_bgcolor: 'rgba(0,0,0,0)',
+            showlegend: false
+        };
+        
+        Plotly.newPlot(divId, data, layout, {displayModeBar: false, responsive: true});
+    }
+
+    function updateGrowthChart(a) {
+        const id = a.id_agente.toString();
+        const divId = 'growthChart';
+        
+        if(!growthData || !growthData[id]) {
+            document.getElementById(divId).innerHTML = '<div style="display:flex;height:100%;align-items:center;justify-content:center;color:#94a3b8;">Sin datos de crecimiento</div>';
+            return;
+        }
+        
+        const series = growthData[id];
+        series.sort((a, b) => a.mes.localeCompare(b.mes));
+        
+        const x_vals = series.map(d => d.mes);
+        const y_nuevos = series.map(d => d.nuevos);
+        const y_regresan = series.map(d => d.regresan);
+        
+        const data = [
+            {
+                x: x_vals, y: y_nuevos, name: 'Nuevos',
+                type: 'bar', marker: {color: '#10b981', cornerradius: 4}
+            },
+            {
+                x: x_vals, y: y_regresan, name: 'Recurrentes',
+                type: 'bar', marker: {color: '#3b82f6', cornerradius: 4}
+            }
+        ];
+        
+        const layout = {
+            barmode: 'stack',
+            margin: { t: 20, b: 40, l: 40, r: 20 },
+            xaxis: { 
+                showgrid: false, 
+                tickfont: { size: 11, color: '#64748b' },
+                fixedrange: true
+            },
+            yaxis: { 
+                showgrid: true, 
+                gridcolor: '#f1f5f9',
+                tickfont: { size: 10, color: '#94a3b8' },
+                fixedrange: true
+            },
+            legend: { orientation: 'h', y: -0.15 },
+            paper_bgcolor: 'rgba(0,0,0,0)',
+            plot_bgcolor: 'rgba(0,0,0,0)',
+        };
+        
+        Plotly.newPlot(divId, data, layout, {displayModeBar: false, responsive: true});
     }
     
     function updateMonthlyTable(a) {
@@ -1814,7 +1932,9 @@ def generate_html_report(df_agents, df_monthly=None, out_path="reports/dashboard
         monthly_json=monthly_data_js,
         centroids_json=centroids_json,
         metrics_json=metrics_json,
-        class_order_json=class_order_json
+        class_order_json=class_order_json,
+        retention_json=retention_json,
+        growth_json=growth_json
     )
     
     os.makedirs(os.path.dirname(out_path), exist_ok=True)

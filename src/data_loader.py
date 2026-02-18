@@ -1,81 +1,69 @@
 import pandas as pd
+import numpy as np
 
 def load_data(file_path):
     """
-    Loads raw player data and performs initial preprocessing.
-    Adapted for NEW schema (Excel).
+    Loads raw player data from CSV and performs initial preprocessing.
+    Adapted for NEW schema (CSV) compatible with metricas_agente.py.
     """
     try:
-        # Load Excel
-        df = pd.read_excel(file_path)
+        # Load CSV
+        df = pd.read_csv(file_path)
         
-        # Rename columns to match internal schema
+        # Rename columns to match internal schema expected by metricas_agente.py
+        # and subsequent reporting steps
         rename_map = {
-            'Agente': 'nombre_usuario_agente',
-            '#': 'rank_global',
-            'Depósitos': 'total_depositos',
-            'Retiros': 'total_retiros',
-            'GGR': 'calculo_ggr',
-            'NGR': 'calculo_ngr',
-            'Comisión': 'calculo_comision',
-            'Jugadores_Únicos': 'active_players',
-            'Categoría': 'Clase',
-            'Score': 'score_global',
-            'Tipo_Agente': 'tipo_agente',
-            # Mappings for Radar Chart compatibility
-            'Punt_Estabilidad': 'Si',
-            'Punt_Rentabilidad': 'Vi',
-            'Punt_Fidelidad': 'Gi',
-            'Punt_Tendencia': 'Ti',
-            'Punt_Volumen': 'Tx_i',
-            'Punt_Rotación': 'Freq_i',
-            'Punt_Eficiencia': 'Conv_i',
-            # Keep other scores as is (or map if needed)
-            'Punt_Crecimiento': 'Punt_Crecimiento',
-            'Punt_Pareto': 'Punt_Pareto',
-            'Punt_Productos': 'Punt_Productos'
+            'date_evento': 'creado',
+            'comis_calculada': 'calculo_ngr',
+            'n_deposito': 'num_depositos',
+            'n_retiro': 'num_retiros',
+            'deposito': 'total_depositos',
+            'retiro': 'total_retiros',
+            'ggr_deportiva': 'apuestas_deportivas_ggr',
+            'ggr_casino': 'casino_ggr',
+            'player_id': 'jugador_id',
+            'agente_username': 'nombre_usuario_agente',
+            'agente_id': 'id_agente'
         }
+        
+        # Check if required columns exist before renaming
+        missing_cols = [k for k in rename_map.keys() if k not in df.columns]
+        if missing_cols:
+            print(f"Warning: Missing columns in CSV: {missing_cols}")
+            
         df = df.rename(columns=rename_map)
 
-        # Generate id_agente (int) from nombre_usuario_agente
-        # Using factorization to ensure unique integer ID per unique name
-        if 'nombre_usuario_agente' in df.columns:
-            # We factorize based on the unique names to ensure consistency
-            # However, if we process month by month, we need a global mapping.
-            # Assuming load_data loads the FULL dataset (all months).
-            df['id_agente'] = pd.factorize(df['nombre_usuario_agente'])[0] + 1 # Start from 1
-            df['id_agente'] = df['id_agente'].astype(int)
-        else:
-             raise ValueError("Column 'Agente' (mapped to 'nombre_usuario_agente') not found.")
-
-        # Parse 'Mes' to 'month' and 'date'
-        # Input format example: "2025-07"
-        if 'Mes' in df.columns:
-            df['date'] = pd.to_datetime(df['Mes'])
-            df['month'] = df['date'].dt.to_period('M')
-        else:
-            raise ValueError("Column 'Mes' not found.")
-            
-        # Fill nulls for numerical columns
-        cols_to_fill = [
-            'rank_global',
+        # Convert 'creado' to datetime
+        if 'creado' in df.columns:
+            df['creado'] = pd.to_datetime(df['creado'], errors='coerce')
+            # Create a 'month' column for compatibility if needed elsewhere
+            df['month'] = df['creado'].dt.to_period('M')
+            df['date'] = df['creado'] # Alias for compatibility
+        
+        # Ensure numerical columns are floats/ints and fill NaNs
+        numeric_cols = [
+            'calculo_ngr', 'num_depositos', 'num_retiros', 
             'total_depositos', 'total_retiros', 
-            'calculo_comision', 'calculo_ngr', 'calculo_ggr',
-            'active_players', 'score_global',
-            'Si', 'Vi', 'Gi', 'Ti', 'Tx_i', 'Freq_i', 'Conv_i'
+            'apuestas_deportivas_ggr', 'casino_ggr'
         ]
         
-        # Add new Punt columns to fillna list
-        cols_to_fill += [c for c in df.columns if c.startswith('Punt_')]
-
-        for col in cols_to_fill:
+        for col in numeric_cols:
             if col in df.columns:
-                df[col] = df[col].fillna(0)
+                df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
             else:
-                # If mapped column is missing, create it with 0 (e.g. if Excel lacks Punt_Fidelidad)
-                if col in rename_map.values():
-                     df[col] = 0
-                
+                df[col] = 0.0
+
+        # Fill ID and Username NaNs
+        if 'nombre_usuario_agente' in df.columns:
+            df['nombre_usuario_agente'] = df['nombre_usuario_agente'].fillna('Unknown')
+            
+        if 'id_agente' in df.columns:
+             df['id_agente'] = df['id_agente'].fillna(0).astype(int)
+        
+        # Ensure jugador_id is treated as string/object to avoid float issues
+        if 'jugador_id' in df.columns:
+            df['jugador_id'] = df['jugador_id'].astype(str)
+
         return df
         
     except Exception as e:
