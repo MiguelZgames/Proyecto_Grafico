@@ -11,8 +11,7 @@ from report_html import generate_html_report
 from logic_analytics import (
     calcular_metricas_agente, calcular_score_total,
     categorizar_agente, calcular_credito_sugerido,
-    predecir_ggr, 
-    analizar_retencion_cohortes, analizar_crecimiento_organico
+    predecir_ggr
 )
 
 def main():
@@ -37,8 +36,7 @@ def main():
     
     agent_records = []
     monthly_records = []
-    retention_records = []
-    growth_records = []
+
     
     for agent_name in agentes:
         try:
@@ -53,12 +51,10 @@ def main():
             ggr_prediccion = predecir_ggr(df_mensual)
             
             # --- 2. DEEP ANALYSIS (RETENTION & GROWTH) ---
-            df_retencion = analizar_retencion_cohortes(df_agent)
-            df_crecimiento = analizar_crecimiento_organico(df_agent)
+            # Removed as per user request
             
             # Calculamos métricas resumen
-            avg_retencion = df_retencion['tasa_retencion'].mean() if df_retencion is not None else 0
-            avg_pct_nuevos = df_crecimiento['pct_nuevos'].mean() if df_crecimiento is not None else 0
+            # Removed as per user request
             
             # --- Build Agent Profile Record (df_agents) ---
             record = {
@@ -72,36 +68,31 @@ def main():
                 'ggr_prediccion': ggr_prediccion,
                 'active_players': df_agent['jugador_id'].nunique(),
                 'total_depositos': df_mensual['total_depositos'].sum(),
+                'total_retiros': df_mensual['total_retiros'].sum(),
                 'calculo_ngr': df_mensual['calculo_ngr'].sum(),
                 'calculo_ggr': df_mensual['apuestas_deportivas_ggr'].sum() + df_mensual['casino_ggr'].sum(),
-                
-                # --- New Analytic Summary Fields ---
-                'avg_retencion_cohortes': round(avg_retencion, 2),
-                'avg_pct_nuevos_organico': round(avg_pct_nuevos, 2)
-            }
+                'calculo_comision': df_mensual['calculo_comision'].sum(),            }
             # Add the 11 individual metric scores
             record.update(metricas)
             agent_records.append(record)
             
-            # --- Build Monthly History Record (df_monthly) ---
+            # --- Collect Monthly Data for Trend/Table ---
             if not df_mensual.empty:
-                df_mensual_reset = df_mensual.reset_index()
-                df_mensual_reset['id_agente'] = record['id_agente']
-                df_mensual_reset['nombre_usuario_agente'] = agent_name
-                df_mensual_reset['month'] = df_mensual_reset['mes'].astype(str)
-                df_mensual_reset['calculo_ggr'] = df_mensual_reset['apuestas_deportivas_ggr'] + df_mensual_reset['casino_ggr']
-                monthly_records.append(df_mensual_reset)
+                monthly_df = df_mensual.copy()
+                monthly_df['id_agente'] = record['id_agente']
+                monthly_df['month'] = monthly_df['mes'].astype(str)
+                monthly_df['calculo_ggr'] = monthly_df['apuestas_deportivas_ggr'] + monthly_df['casino_ggr']
+                # Rename columns to match report expectations
+                monthly_df = monthly_df.rename(columns={
+                    'apuestas_deportivas_ggr': 'ggr_deportiva',
+                    'casino_ggr': 'ggr_casino',
+                })
+                # Add estimated bet columns
+                margen = 0.05
+                monthly_df['total_apuesta_deportiva'] = monthly_df['ggr_deportiva'] / margen
+                monthly_df['total_apuesta_casino'] = monthly_df['ggr_casino'] / margen
+                monthly_records.append(monthly_df)
 
-            # --- Build Retention Record ---
-            if df_retencion is not None and not df_retencion.empty:
-                df_retencion['id_agente'] = record['id_agente']
-                retention_records.append(df_retencion)
-                
-            # --- Build Growth Record ---
-            if df_crecimiento is not None and not df_crecimiento.empty:
-                df_crecimiento['id_agente'] = record['id_agente']
-                growth_records.append(df_crecimiento)
-            
         except Exception as e:
             print(f"Error processing agent {agent_name}: {e}")
             continue
@@ -109,8 +100,6 @@ def main():
     # Create DataFrames
     df_agents = pd.DataFrame(agent_records)
     df_monthly = pd.concat(monthly_records, ignore_index=True) if monthly_records else pd.DataFrame()
-    df_retention = pd.concat(retention_records, ignore_index=True) if retention_records else pd.DataFrame()
-    df_growth = pd.concat(growth_records, ignore_index=True) if growth_records else pd.DataFrame()
 
     # Recalculate rank_global based on score
     if not df_agents.empty:
@@ -123,13 +112,12 @@ def main():
     print(f"Global Aggregation done.")
     print(f"  Agents: {df_agents.shape}")
     print(f"  Monthly Rows: {df_monthly.shape}")
-    print(f"  Retention Rows: {df_retention.shape}")
-    print(f"  Growth Rows: {df_growth.shape}")
+
 
     print("\nGenerating Report...")
     try:
         # Pass new DFs to report generator
-        generate_html_report(df_agents, df_monthly, df_retention, df_growth, output_file)
+        generate_html_report(df_agents, df_monthly, output_file)
         print(f"Report generated at {output_file}")
     except Exception as e:
         print(f"Error generating report: {e}")

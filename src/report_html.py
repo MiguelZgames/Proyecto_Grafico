@@ -6,6 +6,7 @@ from plotly.subplots import make_subplots
 import os
 import json
 from jinja2 import Template
+from src.logic_analytics import PESOS_METRICAS
 
 def calculate_similarity(row, centroids, class_order, metrics):
     current_class = row['Clase']
@@ -14,45 +15,76 @@ def calculate_similarity(row, centroids, class_order, metrics):
         
     try:
         current_idx = class_order.index(current_class)
-        # Find next better class (lower index)
-        if current_idx == 0:
+        # Find next better class (lower index) that actually has a centroid
+        target_class = None
+        target_vals = None
+        
+        # Search upwards (towards index 0)
+        for i in range(current_idx - 1, -1, -1):
+            candidate = class_order[i]
+            if candidate in centroids:
+                target_class = candidate
+                target_vals = centroids[candidate]
+                break
+                
+        if not target_class:
             return {"target": "Top", "dist": 0, "gaps": []}
             
-        target_class = class_order[current_idx - 1]
+        # Calculate Cosine Distance
+        # 1 - Cosine Similarity
+        # Similarity = (A . B) / (||A|| * ||B||)
         
-        if target_class not in centroids:
-            return None
-            
-        target_vals = centroids[target_class]
-        
-        # Calculate Distance (Euclidean)
-        dist = 0
-        gaps = []
+        vec_a = [] # Current
+        vec_b = [] # Target
         
         for m in metrics:
-            curr_val = row[m]
-            targ_val = target_vals[m]
-            diff = targ_val - curr_val
-            dist += diff ** 2
+            val_a = float(row.get(m, 0))
+            val_b = float(target_vals.get(m, 0))
+            vec_a.append(val_a)
+            vec_b.append(val_b)
             
-            if diff > 0: # Improvement needed
-                gaps.append({"metric": m, "diff": diff, "target": targ_val, "current": curr_val})
+        a = np.array(vec_a)
+        b = np.array(vec_b)
         
-        dist = np.sqrt(dist)
+        dot = np.dot(a, b)
+        norm_a = np.linalg.norm(a)
+        norm_b = np.linalg.norm(b)
         
-        # Sort gaps by impact (largest diff)
-        gaps.sort(key=lambda x: x['diff'], reverse=True)
+        if norm_a == 0 or norm_b == 0:
+            dist = 1.0 # Max distance if one vector is zero
+        else:
+            sim = dot / (norm_a * norm_b)
+            # Clip to [-1, 1] to avoid float errors
+            sim = max(-1.0, min(1.0, sim))
+            dist = 1.0 - sim
+            
+        # Identify Gaps (still based on magnitude difference for actionable advice)
+        gaps = []
+        for i, m in enumerate(metrics):
+            diff = vec_b[i] - vec_a[i]
+            if diff > 0.5: # Improvement needed (threshold to avoid noise)
+                gaps.append({
+                    "metric": m, 
+                    "diff": diff, 
+                    "target": vec_b[i], 
+                    "current": vec_a[i],
+                    "impact": diff * PESOS_METRICAS.get(m, 0.1) # Prioritize by weighted impact
+                })
+        
+        # Sort gaps by weighted impact
+        gaps.sort(key=lambda x: x['impact'], reverse=True)
         
         return {
             "target": target_class,
-            "dist": round(dist, 2),
+            "dist": round(dist, 4), # 4 decimals for cosine
             "gaps": gaps[:3] # Top 3 improvements
         }
-    except:
+    except Exception as e:
+        print(f"Error in similarity: {e}")
         return None
 
 
-def generate_html_report(df_agents, df_monthly=None, df_retention=None, df_growth=None, out_path="reports/dashboard.html"):
+def generate_html_report(df_agents, df_monthly=None, out_path="reports/dashboard.html"):
     """
     Genera un dashboard HTML autocontenido con los resultados de la clasificación.
     """
@@ -117,14 +149,14 @@ def generate_html_report(df_agents, df_monthly=None, df_retention=None, df_growt
     centroids_json = json.dumps(centroids)
     metrics_json = json.dumps(metrics_for_sim)
     class_order_json = json.dumps(class_order)
+    weights_json = json.dumps(PESOS_METRICAS)
     
-    # Monthly Data for Trend Lines
     monthly_data_js = "null"
     if df_monthly is not None and not df_monthly.empty:
         # Group by agent and convert to dict {agent_id: [{month, comision, depositos, ...}, ...]}
         monthly_cols = [
-            'id_agente', 'month', 'calculo_comision', 'total_depositos', 'active_players', 'total_retiros', 'calculo_ggr',
-            'ggr_deportiva', 'ggr_casino', 'total_apuesta_deportiva', 'total_apuesta_casino', 'calculo_ngr',
+            'id_agente', 'month', 'calculo_comision', 'total_depositos', 'active_players', 'total_retiros', 'calculo_ggr', 'calculo_ngr',
+            'ggr_deportiva', 'ggr_casino', 'total_apuesta_deportiva', 'total_apuesta_casino',
             'score_global', 
             'rentabilidad', 'volumen', 'fidelidad', 'estabilidad', 
             'crecimiento', 'eficiencia_casino', 'eficiencia_deportes', 
@@ -133,28 +165,21 @@ def generate_html_report(df_agents, df_monthly=None, df_retention=None, df_growt
         ]
         available_cols = [c for c in monthly_cols if c in df_monthly.columns]
         
+        # Sanitize Data: Fill NaNs and Replace Infs
         monthly_min = df_monthly[available_cols].copy()
+        monthly_min = monthly_min.fillna(0).replace([np.inf, -np.inf], 0)
         monthly_min['month'] = monthly_min['month'].astype(str)
+        
+        # Build monthly dict using plain Python dicts (avoids pandas groupby issues)
+        records = monthly_min.to_dict(orient='records')
         monthly_dict = {}
-        for agent_id, group in monthly_min.groupby('id_agente'):
-            monthly_dict[str(agent_id)] = group.drop(columns=['id_agente']).to_dict(orient='records')
+        for row in records:
+            key = str(int(row.pop('id_agente')))
+            monthly_dict.setdefault(key, []).append(row)
+        
         monthly_data_js = json.dumps(monthly_dict)
 
-    # Retention Data
-    retention_json = "null"
-    if df_retention is not None and not df_retention.empty:
-        ret_dict = {}
-        for agent_id, group in df_retention.groupby('id_agente'):
-            ret_dict[str(agent_id)] = group.drop(columns=['id_agente']).to_dict(orient='records')
-        retention_json = json.dumps(ret_dict)
 
-    # Growth Data
-    growth_json = "null"
-    if df_growth is not None and not df_growth.empty:
-        growth_dict = {}
-        for agent_id, group in df_growth.groupby('id_agente'):
-            growth_dict[str(agent_id)] = group.drop(columns=['id_agente']).to_dict(orient='records')
-        growth_json = json.dumps(growth_dict)
 
 
     # 2. Plantilla HTML (Jinja2)
@@ -224,6 +249,7 @@ def generate_html_report(df_agents, df_monthly=None, df_retention=None, df_growt
         h1 { margin: 0; font-size: 18px; font-weight: 600; color: var(--primary); letter-spacing: -0.5px; }
         .header-meta { font-size: 12px; color: var(--text-muted); margin-top: 2px; font-weight: 500; }
         
+        /* Updated KPI Bar with Cards */
         .kpi-bar { display: flex; gap: 20px; }
         .kpi { text-align: center; position: relative; }
         .kpi-val { font-size: 18px; font-weight: 700; line-height: 1.2; }
@@ -329,6 +355,8 @@ def generate_html_report(df_agents, df_monthly=None, df_retention=None, df_growt
             background: var(--card-bg); border-radius: 10px; padding: 16px; 
             box-shadow: var(--shadow); border: 1px solid var(--border);
             transition: transform 0.2s, box-shadow 0.2s;
+            overflow: visible; /* Ensure content is not clipped */
+            position: relative; /* Context for absolute positioning if needed */
         }
         .card:hover { box-shadow: var(--shadow-hover); }
         
@@ -350,10 +378,21 @@ def generate_html_report(df_agents, df_monthly=None, df_retention=None, df_growt
             display: flex; align-items: center; gap: 6px;
             padding-bottom: 6px; border-bottom: 1px dashed var(--border);
         }
-        .metrics-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+        .metrics-grid { 
+            display: flex; 
+            flex-wrap: wrap; 
+            gap: 10px; 
+            width: 100%;
+            min-height: 50px; /* Ensure it has height */
+        }
         .metric-box { 
-            background: #fafbfc; padding: 10px 6px; border-radius: 6px; text-align: center; border: 1px solid #eee;
+            background: #fafbfc; 
+            padding: 10px 6px; 
+            border-radius: 6px; 
+            text-align: center; 
+            border: 1px solid #eee;
             transition: transform 0.2s;
+            flex: 1 1 110px; /* Grow, shrink, base 110px */
         }
         .metric-box:hover { transform: translateY(-2px); border-color: var(--accent); }
         .metric-val { font-size: 15px; font-weight: 700; color: var(--primary); margin-bottom: 2px; }
@@ -372,8 +411,19 @@ def generate_html_report(df_agents, df_monthly=None, df_retention=None, df_growt
             height: 100%;
             display: flex;
             flex-direction: column;
+            /* Importante: no centrar TODO el contenido del card, solo el gráfico.
+               Si centramos el card entero, la barra de etiquetas se "va" al centro. */
+            align-items: stretch;
+            justify-content: flex-start;
             padding: 14px;
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+        
+        #radarChart {
+            width: 100%;
+            height: 100%;
+            min-height: 400px;
+            position: relative;
         }
 
         .trend-section {
@@ -385,6 +435,7 @@ def generate_html_report(df_agents, df_monthly=None, df_retention=None, df_growt
         }
         
         .chart-title { 
+            width: 100%; /* Ensure full width even with centered card items */
             font-size: 15px;
             font-weight: 700; 
             letter-spacing: -0.025em;
@@ -424,7 +475,6 @@ def generate_html_report(df_agents, df_monthly=None, df_retention=None, df_growt
         .pass { color: var(--success); } .fail { color: var(--text-muted); opacity: 0.6; }
 
         /* Tables */
-        /* Tables */
         table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 13px; margin-top: 10px; }
         th, td { padding: 12px 15px; text-align: left; border-bottom: 1px solid #e2e8f0; }
         th { 
@@ -443,7 +493,7 @@ def generate_html_report(df_agents, df_monthly=None, df_retention=None, df_growt
         @media (max-width: 1366px) { .grid { grid-template-columns: 260px 1fr; } }
         @media (max-width: 1100px) { 
             .grid { grid-template-columns: 220px 1fr; } 
-            .metrics-grid { grid-template-columns: repeat(3, 1fr); }
+            /* .metrics-grid handled by auto-fill */
             /* .radar-section handled above */
         }
         @media (max-width: 768px) { 
@@ -475,6 +525,9 @@ def generate_html_report(df_agents, df_monthly=None, df_retention=None, df_growt
         .ms-selected-bar {
             display: flex; flex-wrap: wrap; gap: 5px; align-items: center;
             padding: 8px 0 0 0;
+            width: 100%;
+            justify-content: flex-start;
+            align-self: flex-start;
         }
         .ms-dropdown {
             position: absolute; top: calc(100% + 4px); right: 0; width: 300px;
@@ -615,7 +668,7 @@ def generate_html_report(df_agents, df_monthly=None, df_retention=None, df_growt
                     <div class="metric-box"><div class="metric-val" id="valEst">-</div><div class="metric-lbl">Estabilidad</div></div>
                     <div class="metric-box"><div class="metric-val" id="valCre">-</div><div class="metric-lbl">Crecimiento</div></div>
                     <div class="metric-box"><div class="metric-val" id="valCas">-</div><div class="metric-lbl">Efic. Casino</div></div>
-                    <div class="metric-box"><div class="metric-val" id="valDep">-</div><div class="metric-lbl">Efic. Deportes</div></div>
+                    <div class="metric-box"><div class="metric-val" id="valDepScore">-</div><div class="metric-lbl">Efic. Deportes</div></div>
                     <div class="metric-box"><div class="metric-val" id="valConv">-</div><div class="metric-lbl">Conversión</div></div>
                     <div class="metric-box"><div class="metric-val" id="valTen">-</div><div class="metric-lbl">Tendencia</div></div>
                     <div class="metric-box"><div class="metric-val" id="valDiv">-</div><div class="metric-lbl">Diversificación</div></div>
@@ -656,7 +709,8 @@ def generate_html_report(df_agents, df_monthly=None, df_retention=None, df_growt
                     </div>
                 </div>
                 <div class="ms-selected-bar" id="msSelectedBar"></div>
-                <div id="radarChart" style="height: 100%; min-height: 40vh; width: 100%;"></div>
+                <!-- Fixed height container to ensure stability -->
+                <div id="radarChart" style="width: 100%; height: 500px;"></div>
             </div>
             <div class="card">
                 <div class="chart-title">
@@ -674,8 +728,8 @@ def generate_html_report(df_agents, df_monthly=None, df_retention=None, df_growt
                         ↺
                     </button>
                 </div>
-                <div id="barNarrative" style="font-size:12px; padding:4px 12px 0; line-height:1.5; min-height:18px;"></div>
-                <div id="barChart" style="height: 100%; min-height: 40vh; width: 100%;"></div>
+
+                <div id="barChart" style="width: 100%; height: 500px;"></div>
             </div>
         </div>
 
@@ -708,39 +762,7 @@ def generate_html_report(df_agents, df_monthly=None, df_retention=None, df_growt
             </div>
         </div>
         
-        <!-- Deep Analysis Charts -->
-        <div class="radar-section"> <!-- Reusing grid layout -->
-            <div class="card">
-                <div class="chart-title">
-                    <span style="font-size:20px;">👥</span> 
-                    <span style="display:flex; align-items:center;">
-                        Retención (Cohortes)
-                        <span class="info-icon">! 
-                            <span class="tooltip-text">Porcentaje de jugadores de cada cohorte mensual que regresan en meses subsiguientes.</span>
-                        </span>
-                    </span>
-                     <button class="reset-btn" onclick="resetChart('retentionChart')" title="Reiniciar gráfico" style="margin-left:auto;">
-                        ↺
-                    </button>
-                </div>
-                <div id="retentionChart" style="height: 100%; min-height: 40vh; width: 100%;"></div>
-            </div>
-            <div class="card">
-                <div class="chart-title">
-                    <span style="font-size:20px;">🌱</span> 
-                    <span style="display:flex; align-items:center;">
-                        Crecimiento Orgánico
-                        <span class="info-icon">! 
-                            <span class="tooltip-text">Desglose mensual de jugadores activos por tipo: Nuevos (primera vez), Recurrentes (mes anterior) y Resucitados (inactivos que vuelven).</span>
-                        </span>
-                    </span>
-                    <button class="reset-btn" onclick="resetChart('growthChart')" title="Reiniciar gráfico" style="margin-left:auto;">
-                        ↺
-                    </button>
-                </div>
-                <div id="growthChart" style="height: 100%; min-height: 40vh; width: 100%;"></div>
-            </div>
-        </div>
+
 
         <!-- Monthly Table -->
         <div class="card">
@@ -757,6 +779,8 @@ def generate_html_report(df_agents, df_monthly=None, df_retention=None, df_growt
                     <thead>
                         <tr>
                             <th>Mes</th>
+                            <th class="num-col">Jugadores</th>
+                            <th class="num-col">Score</th>
                             <th class="num-col">Depósitos</th>
                             <th class="num-col">Retiros</th>
                             <th class="num-col">GGR</th>
@@ -816,9 +840,8 @@ def generate_html_report(df_agents, df_monthly=None, df_retention=None, df_growt
     let staticTopAgent = {{ top_agent_json | safe }};
     
     const monthlyData = {{ monthly_json | safe }}; 
-    const retentionData = {{ retention_json | safe }};
-    const growthData = {{ growth_json | safe }};
-    
+    const globalWeights = {{ weights_json | safe }}; 
+
     const listEl = document.getElementById('agentList');
     let currentFilter = 'all';
     let selectedCompareIds = [];
@@ -861,33 +884,69 @@ def generate_html_report(df_agents, df_monthly=None, df_retention=None, df_growt
         if (!classOrder.includes(currentClass)) return null;
         
         const currentIdx = classOrder.indexOf(currentClass);
-        // 0 is best (A+++)
-        if (currentIdx === 0) return { target: "Top", dist: 0, gaps: [] };
         
-        const targetClass = classOrder[currentIdx - 1];
-        if (!centroids[targetClass]) return null;
+        // Find next better class (lower index) that actually has a centroid
+        let targetClass = null;
+        let targetVals = null;
         
-        const targetVals = centroids[targetClass];
-        let dist = 0;
+        for (let i = currentIdx - 1; i >= 0; i--) {
+            const candidate = classOrder[i];
+            if (centroids[candidate]) {
+                targetClass = candidate;
+                targetVals = centroids[candidate];
+                break;
+            }
+        }
+        
+        if (!targetClass) return { target: "Top", dist: 0, gaps: [] };
+        
+        // Calculate Cosine Distance
+        // 1 - Cosine Similarity
+        
+        let dot = 0;
+        let normA = 0;
+        let normB = 0;
         const gaps = [];
         
+        // Use weights for gap impact
+        const weights = window.weightsData || {{ weights_json | safe }} || {};
+        
         simMetrics.forEach(m => {
-            const currVal = agent[m] || 0;
-            const targVal = targetVals[m] || 0;
-            const diff = targVal - currVal;
-            dist += diff * diff;
+            const valA = agent[m] || 0;
+            const valB = targetVals[m] || 0;
             
-            if (diff > 0) {
-                gaps.push({ metric: m, diff: diff, target: targVal, current: currVal });
+            dot += valA * valB;
+            normA += valA * valA;
+            normB += valB * valB;
+            
+            const diff = valB - valA;
+            if (diff > 0.5) { // Improvement needed (threshold)
+                gaps.push({ 
+                    metric: m, 
+                    diff: diff, 
+                    target: valB, 
+                    current: valA,
+                    impact: diff * (weights[m] || 0.1)
+                });
             }
         });
         
-        dist = Math.sqrt(dist);
-        gaps.sort((a, b) => b.diff - a.diff);
+        normA = Math.sqrt(normA);
+        normB = Math.sqrt(normB);
+        
+        let dist = 1.0;
+        if (normA > 0 && normB > 0) {
+           let sim = dot / (normA * normB);
+           if (sim > 1) sim = 1;
+           if (sim < -1) sim = -1;
+           dist = 1.0 - sim;
+        }
+        
+        gaps.sort((a, b) => b.impact - a.impact);
         
         return {
             target: targetClass,
-            dist: parseFloat(dist.toFixed(2)),
+            dist: parseFloat(dist.toFixed(4)),
             gaps: gaps.slice(0, 3)
         };
     }
@@ -1107,9 +1166,8 @@ def generate_html_report(df_agents, df_monthly=None, df_retention=None, df_growt
     }
 
     function updateTopAgencies() {
-        // Date Filter Removed - Using full range
-        
-        // Recalculate Metrics for range
+        try {
+            // Recalculate Metrics for range
         displayedAgents = allAgents.map(agent => {
             const mData = monthlyData ? monthlyData[agent.id_agente.toString()] : null;
             if (!mData) return { ...agent, _noData: true, total_depositos: 0, score_global: 0 };
@@ -1172,6 +1230,10 @@ def generate_html_report(df_agents, df_monthly=None, df_retention=None, df_growt
             selectAgent(activeItem.dataset.id); 
         } else if (displayedAgents.length > 0) {
             selectAgent(displayedAgents[0].id_agente);
+        }
+        } catch (e) {
+            console.error("Error in updateTopAgencies:", e);
+            document.querySelector('header').insertAdjacentHTML('beforeend', `<div style="background:orange;color:white;font-size:10px;">Render Error: ${e.message}</div>`);
         }
     }
 
@@ -1293,323 +1355,256 @@ def generate_html_report(df_agents, df_monthly=None, df_retention=None, df_growt
     }
 
     function renderRadar(a) {
-        const metrics = [
-            'Rentabilidad', 'Volumen', 'Fidelidad', 'Estabilidad', 
-            'Crecimiento', 'Efic. Casino', 'Efic. Deportes', 'Conversión', 
-            'Tendencia', 'Diversificación', 'Calidad'
-        ];
+        if (!a) return;
         
-        const metricKeys = [
-            'rentabilidad', 'volumen', 'fidelidad', 'estabilidad', 
-            'crecimiento', 'eficiencia_casino', 'eficiencia_deportes', 
-            'eficiencia_conversion', 'tendencia', 'diversificacion', 'calidad_jugadores'
-        ];
-        
-        // Calculate average of ALL agents as benchmark
-        const validAgents = displayedAgents.filter(x => !x._noData);
-        
-        const s = (obj, key) => (obj[key] || 0);
-        const valA = metricKeys.map(k => s(a, k));
-        const valAvg = metricKeys.map(k => {
-            if (validAgents.length === 0) return 0;
-            const sum = validAgents.reduce((acc, ag) => acc + s(ag, k), 0);
-            return sum / validAgents.length;
-        });
-        
-        // --- RADAR DATA ---
-        // Close the polygon by repeating the first point
-        const radarMetrics = [...metrics, metrics[0]];
-        const radarValAvg = [...valAvg, valAvg[0]];
-        const radarValA = [...valA, valA[0]];
-        
-        const radarData = [
-            /* Benchmark removed for cleaner UI
-            {
-                type: 'scatterpolar',
-                r: radarValAvg,
-                theta: radarMetrics,
-                fill: 'toself',
-                name: `Promedio Global (${validAgents.length} agentes)`,
-                line: {color: '#94a3b8', width: 0, dash: 'dot'},
-                marker: {size: 4, color: '#94a3b8'},
-                fillcolor: 'rgba(148, 163, 184, 0.12)',
-                hoverinfo: 'text',
-                text: radarValAvg.map((v, i) => `${radarMetrics[i]}: ${v.toFixed(1)}`)
-            }, */
-            {
-                type: 'scatterpolar',
-                r: radarValA,
-                theta: radarMetrics,
-                fill: 'toself',
-                name: a.nombre_usuario_agente || 'Seleccionado',
-                line: {color: '#2563eb', width: 3},
-                marker: {size: 6, color: '#2563eb', line: {color: 'white', width: 1.5}},
-                fillcolor: 'rgba(37, 99, 235, 0.25)',
-                hoverinfo: 'text',
-                text: radarValA.map((v, i) => `${radarMetrics[i]}: ${v.toFixed(1)}`),
-                showlegend: false
+        try {
+            // Updated to use global variable for robustness
+            const weights = window.globalWeights || (typeof globalWeights !== 'undefined' ? globalWeights : {});
+            
+            // Check DOM Elements
+            const radarDiv = document.getElementById('radarChart');
+            const barDiv = document.getElementById('barChart');
+            
+            if (!radarDiv || !barDiv) {
+                console.warn("Chart containers not found");
+                return;
             }
-        ];
 
-        // --- BAR DATA (Storytelling Redesign) ---
+            // Cleanup previous instances
+            try { Plotly.purge(radarDiv); } catch(e){}
+            try { Plotly.purge(barDiv); } catch(e){} 
         
-        // 1. Prepare Data & Sort by Gap (Narrative)
-        // Sort: Best (Positive Gap) at Bottom -> Worst (Negative Gap) at Top
-        let chartData = metrics.map((m, i) => {
-            const vA = valA[i] * 10; // 0-100 scale
-            const vAvg = valAvg[i] * 10;
-            const diff = vA - vAvg;
+            // Definitions for Metrics
+            const metricKeys = [
+                'rentabilidad', 'volumen', 'fidelidad', 'estabilidad', 
+                'crecimiento', 'eficiencia_casino', 'eficiencia_deportes', 
+                'eficiencia_conversion', 'tendencia', 'diversificacion', 'calidad_jugadores'
+            ];
+            
+            // Display Names
+            const displayNames = {
+                'rentabilidad': 'Rentabilidad', 'volumen': 'Volumen', 'fidelidad': 'Fidelidad',
+                'estabilidad': 'Estabilidad', 'crecimiento': 'Crecimiento', 'eficiencia_casino': 'Efic. Casino',
+                'eficiencia_deportes': 'Efic. Deportes', 'eficiencia_conversion': 'Conversión',
+                'tendencia': 'Tendencia', 'diversificacion': 'Diversificación', 'calidad_jugadores': 'Calidad'
+            };
+
+            let chartData = metricKeys.map(key => {
+            const rawVal = a[key] || 0; // 0-10
+            const weight = weights[key] || 0;
+            const contribution = rawVal * weight;
+            const maxContribution = 10 * weight;
+            const pctWeight = (weight * 100).toFixed(0) + '%';
+            
             return {
-                metric: m,
-                valA: vA,
-                valTop: vAvg,
-                diff: diff,
-                origIndex: i
+                key: key,
+                name: displayNames[key] || key,
+                rawVal: rawVal,
+                weight: weight,
+                contribution: contribution,
+                maxContribution: maxContribution,
+                labelRadar: displayNames[key] || key // Reverted: Labels without weight for stability
             };
         });
 
-        // Sort: Descending Gap (Positive -> Negative)
-        // Plotly plots index 0 at bottom, so Positive (Best) will be at bottom, Negative (Priorities) at Top.
-        chartData.sort((a, b) => b.diff - a.diff);
-
-        const sortedMetrics = chartData.map(d => d.metric);
-        const sortedValA = chartData.map(d => d.valA);
-        const sortedValTop = chartData.map(d => d.valTop);
-        const sortedDiff = chartData.map(d => d.diff);
-
-        // 2. Generate Insight Text
-        const topStrengths = chartData.filter(d => d.diff > 0).slice(0, 3).map(d => d.metric); // Top 3 positives
-        const topPriorities = chartData.filter(d => d.diff < 0).slice(-3).reverse().map(d => d.metric); // Bottom 3 negatives (worst first)
-
-        let narrativeText = "";
-        if (topStrengths.length > 0) narrativeText += `<span style='color:#16a34a'><b>Fortalezas:</b> ${topStrengths.join(', ')}</span>`;
-        if (topStrengths.length > 0 && topPriorities.length > 0) narrativeText += "  |  ";
-        if (topPriorities.length > 0) narrativeText += `<span style='color:#dc2626'><b>Prioridades:</b> ${topPriorities.join(', ')}</span>`;
-        if (!narrativeText) narrativeText = "Desempeño alineado con Benchmark";
-        // Render narrative into HTML div
-        const barNarrDiv = document.getElementById('barNarrative');
-        if (barNarrDiv) barNarrDiv.innerHTML = narrativeText;
-        // Exclude currently selected agent from compare list
-        const compareIds = selectedCompareIds.filter(id => id != a.id_agente);
+        // --- RADAR CHART (Profile 0-10) ---
         
-        const barData = [];
-        const hasCompare = compareIds.length > 0;
+        const radarMetrics = chartData.map(d => d.labelRadar);
+        const radarValA = chartData.map(d => d.rawVal);
+        
+        // Close the loop
+        radarMetrics.push(radarMetrics[0]);
+        radarValA.push(radarValA[0]);
+        
+        const radarData = [{
+            type: 'scatterpolar',
+            r: radarValA,
+            theta: radarMetrics,
+            fill: 'toself',
+            name: a.nombre_usuario_agente || 'Seleccionado',
+            line: {color: '#2563eb', width: 3},
+            marker: {size: 6, color: '#2563eb', line: {color: 'white', width: 1.5}},
+            // SOFTER COLOR: Reduced opacity for cleaner look
+            fillcolor: 'rgba(59, 130, 246, 0.35)', // More vibrant for "atracción visual"
+            // Enhanced HTML Tooltip
+            hovertemplate: 
+                '<b>%{theta}</b><br>' +
+                'Score: %{r:.1f} / 10<br>' +
+                'Peso: %{customdata[0]:.0%}<br>' +
+                'Impacto: %{customdata[1]:.2f} pts<br>' +
+                '<extra></extra>',
+            customdata: chartData.map(d => [d.weight, d.contribution]).concat([[chartData[0].weight, chartData[0].contribution]]), // Close loop data
+            showlegend: false
+        }];
 
-        if (!hasCompare) {
-            // ===== SINGLE AGENT VIEW: Performance-gradient bars =====
-            
-            // Trace 1: Background Track (subtle)
-            // Trace 1: Background Track (Removed)
-            /* barData.push({
-                y: sortedMetrics,
-                x: sortedMetrics.map(() => 100),
-                type: 'bar',
-                orientation: 'h',
-                marker: { color: '#f1f5f9', line: { width: 0 }, cornerradius: 4 },
-                hoverinfo: 'skip',
-                showlegend: false
-            }); */
+        // --- BAR CHART (Smart Analysis) ---
+        // Display raw score (0-10) but explain the WEIGHTED OPPORTUNITY (Gap)
+        
+        // Clone for sorting
+        let barDataSorted = [...chartData].sort((a, b) => b.rawVal - a.rawVal);
+        
+        const barLabels = barDataSorted.map(d => d.name);
+        barLabels.reverse();
+        
+        const barValues = barDataSorted.map(d => d.rawVal).reverse();
+        const barMax = barDataSorted.map(d => 10).reverse();
+        
+        // Calculate Weighted Gap (Opportunity)
+        // (10 - Score) * Weight = Points missing from global score
+        const barMeta = barDataSorted.map(d => {
+            const gap = 10 - d.rawVal;
+            const weightedGap = gap * d.weight;
+            return [d.weight, weightedGap];
+        }).reverse();
+        
+        // Trace 1: Grey Background
+        const traceMax = {
+            x: barMax,
+            y: barLabels,
+            type: 'bar',
+            orientation: 'h',
+            marker: { color: '#f1f5f9', cornerradius: 4 },
+            hoverinfo: 'skip',
+            showlegend: false
+        };
+        
+        // Trace 2: Filled Bar (Earned Score)
+        const traceEarned = {
+            x: barValues,
+            y: barLabels,
+            type: 'bar',
+            orientation: 'h',
+            name: 'Puntaje',
+            marker: { color: '#2563eb', cornerradius: 4 },
+            text: barValues.map(v => v.toFixed(1)),
+            textposition: 'auto',
+            textfont: { family: 'Inter', color: 'white', size: 10 },
+            hovertemplate: 
+                '<b>%{y}</b><br>' +
+                'Score: %{x:.1f} / 10<br>' +
+                'Peso: %{customdata[0]:.0%}<br>' +
+                'Oportunidad: +%{customdata[1]:.2f} pts globales<br>' +
+                '<extra></extra>',
+            customdata: barMeta,
+            showlegend: false
+        };
+        
+        // Initial Bar Data (Single Agent)
+        let barData = [traceMax, traceEarned];
+        let currentBarMode = 'overlay';
+        let chartHeight = 500;
 
-            // Trace 2: Agent bars (uniform blue)
-            barData.push({
-                y: sortedMetrics,
-                x: sortedValA,
-                type: 'bar',
-                orientation: 'h',
-                name: a.nombre_usuario_agente || 'Seleccionado',
-                marker: { color: '#2563eb', cornerradius: 4 },
-                text: sortedValA.map(v => v >= 8 ? v.toFixed(1) + '%' : ''),
-                textposition: 'inside',
-                insidetextanchor: 'end',
-                textfont: { family: 'Inter', color: 'white', size: 11, weight: 600 },
-                hovertemplate: '<b>%{y}</b><br>Valor: %{x:.1f}%<extra></extra>'
-            });
+        // --- MULTI-AGENT COMPARISON LOGIC ---
+        
+        if (typeof selectedCompareIds !== 'undefined' && selectedCompareIds.length > 0) {
+            currentBarMode = 'group';
+            chartHeight = 550; // Increase height for grouped bars
             
-            // Trace 3: Value labels outside short bars
-            const outsideText = sortedValA.map(v => v < 8 ? v.toFixed(1) + '%' : '');
-            barData.push({
-                y: sortedMetrics,
-                x: sortedValA.map(v => v < 8 ? v + 2 : null),
-                type: 'scatter',
-                mode: 'text',
-                text: outsideText,
-                textposition: 'middle right',
-                textfont: { family: 'Inter', size: 11, color: '#475569' },
-                hoverinfo: 'skip',
-                showlegend: false
-            });
-
-            // Trace 4: Delta Labels (Right Axis) — clean annotations
-            const deltaText = sortedDiff.map(d => {
-                const sign = d > 0 ? '+' : '';
-                const color = d >= 0 ? '#059669' : '#dc2626';
-                const icon = d >= 5 ? '▲' : d <= -5 ? '▼' : '●';
-                return `<span style="color:${color}; font-weight:600;">${icon} ${sign}${d.toFixed(1)}</span>`;
-            });
-
-            barData.push({
-                y: sortedMetrics,
-                x: sortedMetrics.map(() => 122),
-                type: 'scatter',
-                mode: 'text',
-                text: deltaText,
-                textposition: 'middle left',
-                textfont: { family: 'Inter', size: 11 },
-                hoverinfo: 'skip',
-                showlegend: false
-            });
+            // In comparison mode, remove background bar and show Legend
+            traceEarned.name = a.nombre_usuario_agente || 'Seleccionado';
+            traceEarned.showlegend = false; // Disable legend as requested
+            barData = [traceEarned]; 
             
-        } else {
-            // ===== MULTI-AGENT VIEW: Grouped bars =====
+            const agentPool = (typeof allAgents !== 'undefined') ? allAgents : displayedAgents;
             
-            // Selected Agent bars (blue)
-            barData.push({
-                y: sortedMetrics,
-                x: sortedValA,
-                type: 'bar',
-                orientation: 'h',
-                name: a.nombre_usuario_agente || 'Seleccionado',
-                marker: { color: '#2563eb', cornerradius: 3 },
-                text: sortedValA.map(v => v >= 12 ? v.toFixed(0) + '%' : ''),
-                textposition: 'inside',
-                insidetextanchor: 'end',
-                textfont: { family: 'Inter', color: 'white', size: 10 },
-                hovertemplate: '<b>%{y}</b><br>%{fullData.name}: %{x:.1f}%<extra></extra>',
-                showlegend: false
-            });
-            
-            // Comparison agents as grouped bars
-            compareIds.forEach((compId, idx) => {
-                const compAgent = displayedAgents.find(x => x.id_agente == compId) || allAgents.find(x => x.id_agente == compId);
+            selectedCompareIds.forEach((compId, idx) => {
+                if (compId == a.id_agente) return;
+                
+                const compAgent = agentPool.find(ag => ag.id_agente == compId);
                 if (!compAgent) return;
-                const color = compareColors[selectedCompareIds.indexOf(compId) % compareColors.length];
-                const valComp = metricKeys.map(k => s(compAgent, k));
-                const sortedValComp = chartData.map(d => valComp[d.origIndex] * 10);
+                
+                // Radar Part
+                const weights = window.weightsData || {}; 
+                const compRawVals = metricKeys.map(key => compAgent[key] || 0);
+                compRawVals.push(compRawVals[0]); 
+                
+                const color = compareColors[idx % compareColors.length];
+                const compName = compAgent.nombre_usuario_agente || `Agente ${compId}`;
+                
+                radarData.push({
+                    type: 'scatterpolar',
+                    r: compRawVals,
+                    theta: radarMetrics,
+                    fill: 'toself', 
+                    fillcolor: hexToRgba(color, 0.25),
+                    name: compName,
+                    line: {color: color, width: 2, dash: 'dot'},
+                    marker: {size: 4, color: color},
+                    hovertemplate: `<b>${compName}</b><br>%{theta}: %{r:.1f} / 10<br><extra></extra>`,
+                    showlegend: false 
+                });
+
+                // Bar Part - Map values to match the sorted order of the main agent
+                const compBarValues = barDataSorted.map(d => compAgent[d.key] || 0).reverse();
                 
                 barData.push({
-                    y: sortedMetrics,
-                    x: sortedValComp,
+                    x: compBarValues,
+                    y: barLabels,
                     type: 'bar',
                     orientation: 'h',
-                    name: compAgent.nombre_usuario_agente || 'Comparado',
-                    marker: { color: color, cornerradius: 3 },
-                    text: sortedValComp.map(v => v >= 12 ? v.toFixed(0) + '%' : ''),
-                    textposition: 'inside',
-                    insidetextanchor: 'end',
+                    name: compName,
+                    marker: { color: color, cornerradius: 4 },
+                    text: compBarValues.map(v => v.toFixed(1)),
+                    textposition: 'auto',
                     textfont: { family: 'Inter', color: 'white', size: 10 },
-                    hovertemplate: '<b>%{y}</b><br>%{fullData.name}: %{x:.1f}%<extra></extra>',
+                    hovertemplate: `<b>${compName}</b><br>%{y}: %{x:.1f} / 10<br><extra></extra>`,
                     showlegend: false
                 });
             });
         }
 
-        // Benchmark Markers (Invisible for hover on benchmark value)
-        barData.push({
-            y: sortedMetrics,
-            x: sortedValTop,
-            type: 'scatter',
-            mode: 'markers',
-            name: 'Promedio',
-            marker: { opacity: 0, size: 15 },
-            hovertemplate: '<b>%{y}</b><br>Promedio: %{x:.1f}%<extra></extra>',
-            showlegend: false
-        });
-
-        // Handle Comparison Agents for RADAR only (bar is handled above)
-        compareIds.forEach((compId, idx) => {
-            const compAgent = displayedAgents.find(x => x.id_agente == compId) || allAgents.find(x => x.id_agente == compId);
-            if (!compAgent) return;
-            const color = compareColors[selectedCompareIds.indexOf(compId) % compareColors.length];
-            const valComp = metricKeys.map(k => s(compAgent, k));
-            const radarValComp = [...valComp, valComp[0]];
-
-            // Add to Radar (no legend — tags are shown above)
-            radarData.push({
-                type: 'scatterpolar',
-                r: radarValComp,
-                theta: radarMetrics,
-                fill: 'toself',
-                name: compAgent.nombre_usuario_agente || 'Comparado',
-                line: {color: color, width: 2},
-                fillcolor: hexToRgba(color, 0.15),
-                hoverinfo: 'text',
-                text: radarValComp.map((v, i) => `${radarMetrics[i]}: ${v.toFixed(1)}`),
-                showlegend: false
-            });
-        });
-
-        // Shapes for Benchmark Lines
-        const shapes = [];
-        /* Benchmark lines removed to clean up UI
-        sortedValTop.forEach((val, i) => {
-            shapes.push({
-                type: 'line',
-                x0: val, x1: val,
-                y0: i - 0.4, y1: i + 0.4,
-                xref: 'x', yref: 'y',
-                line: { color: '#94a3b8', width: 2, dash: 'dot' }
-            });
-        }); */
-
         const radarLayout = {
             polar: {
                 radialaxis: { visible: true, range: [0, 10], showticklabels: false, ticks: '' },
-                angularaxis: { tickfont: { size: 11, color: '#64748b', family: 'Inter, sans-serif' } },
-                gridshape: 'linear'
+                angularaxis: { tickfont: { size: 11, color: '#64748b', family: 'Inter', weight: 600 } },
+                gridshape: 'linear',
+                domain: { x: [0, 1], y: [0, 1] }
             },
-            margin: { t: 20, b: 45, l: 35, r: 35 },
-            showlegend: true,
-            legend: { orientation: 'h', y: -0.1, xanchor: 'center', x: 0.5, font: { size: 10, color: '#94a3b8' }, bgcolor: 'rgba(0,0,0,0)' },
+            margin: { t: 80, b: 80, l: 80, r: 80 },
+            autosize: true,
+            showlegend: false,
             paper_bgcolor: 'rgba(0,0,0,0)',
-            plot_bgcolor: 'rgba(0,0,0,0)',
-            transition: { duration: 300, easing: 'cubic-in-out' }
-            // height removed to let it be responsive
+            plot_bgcolor: 'rgba(0,0,0,0)'
         };
 
         const barLayout = {
-            margin: { t: 15, b: 20, l: 130, r: hasCompare ? 20 : 70 }, 
-            barmode: hasCompare ? 'group' : 'overlay',
+            margin: { t: 10, b: 30, l: 110, r: 20 }, 
+            barmode: currentBarMode,
             xaxis: { 
-                range: [0, hasCompare ? 105 : 140], 
-                showgrid: hasCompare, 
-                gridcolor: '#f1f5f9',
-                zeroline: false, 
-                showticklabels: hasCompare,
-                ticksuffix: '%',
-                tickfont: { size: 10, color: '#94a3b8', family: 'Inter' },
+                range: [0, 10.5], 
+                showgrid: true, gridcolor: '#f1f5f9', zeroline: false, 
+                showticklabels: true, tickfont: { size: 10, color: '#94a3b8' },
                 fixedrange: true 
             },
             yaxis: { 
                 tickfont: { size: 11, color: '#0f172a', family: 'Inter' },
-                gridcolor: 'rgba(0,0,0,0)',
-                automargin: true,
-                fixedrange: true
+                automargin: true, fixedrange: true
             },
-            shapes: shapes,
+            legend: { orientation: 'h', y: -0.2, font: { size: 10 } },
             paper_bgcolor: 'rgba(0,0,0,0)',
             plot_bgcolor: 'rgba(0,0,0,0)',
-            plot_bgcolor: 'rgba(0,0,0,0)',
-            // height removed
-            showlegend: false,
-            bargap: hasCompare ? 0.25 : 0.4,
-            bargroupgap: hasCompare ? 0.08 : 0
+            showlegend: false, // Always hide legend as requested for multi-agent view
+            height: chartHeight
         };
         
         Plotly.newPlot('radarChart', radarData, radarLayout, {displayModeBar: false, responsive: true});
+        
+        // Resize container to match strict chart height (prevents overflow)
+        const barContainer = document.getElementById('barChart');
+        if(barContainer) barContainer.style.height = chartHeight + 'px';
+        
         Plotly.newPlot('barChart', barData, barLayout, {displayModeBar: false, responsive: true});
         
-        // Sync interactions
-        const radarDiv = document.getElementById('radarChart');
-        const barDiv = document.getElementById('barChart');
         
-        if(radarDiv && barDiv) {
-            radarDiv.on('plotly_click', function(data){
-                // Interaction logic if needed
-            });
+        } catch (e) {
+            console.error("Error rendering charts:", e);
+            document.getElementById('radarChart').innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100%;color:red;">Error: ${e.message}</div>`;
         }
     }
 
+
     function updateRadarChart() {
+
         const activeItem = document.querySelector('.agent-item.active');
         if(!activeItem) return;
         const id = activeItem.dataset.id;
@@ -1622,6 +1617,7 @@ def generate_html_report(df_agents, df_monthly=None, df_retention=None, df_growt
         if(!activeItem) return;
         const id = activeItem.dataset.id;
         const agent = displayedAgents.find(a => a.id_agente == id);
+        // Force re-render even if data seems same, to handle display toggles
         if(agent) renderTrend(agent);
     }
 
@@ -1648,6 +1644,14 @@ def generate_html_report(df_agents, df_monthly=None, df_retention=None, df_growt
     }
 
     function renderTrend(a) {
+        if (!a) return;
+        
+        const divId = 'trendChart';
+        const chartDiv = document.getElementById(divId);
+        if (!chartDiv) return;
+        
+        try { Plotly.purge(chartDiv); } catch(e){}
+
         const id = a.id_agente.toString();
         const select = document.getElementById('metricSelect');
         const metricKey = select.value;
@@ -1753,7 +1757,6 @@ def generate_html_report(df_agents, df_monthly=None, df_retention=None, df_growt
                 legend: { orientation: 'h', y: 1.1, font: { size: 11, color: '#64748b', family: 'Inter' } },
                 showlegend: !isMulti,
                 dragmode: 'zoom',
-                dragmode: 'zoom',
                 transition: { duration: 300, easing: 'cubic-in-out' },
                 hoverlabel: { bgcolor: "rgba(255, 255, 255, 0.95)", bordercolor: "#e2e8f0", font: { family: "Inter", size: 12, color: "#1e293b" } }
             };
@@ -1780,110 +1783,10 @@ def generate_html_report(df_agents, df_monthly=None, df_retention=None, df_growt
             displaylogo: false
         });
         
-        updateRetentionChart(a);
-        updateGrowthChart(a);
         updateMonthlyTable(a);
     }
     
-    function updateRetentionChart(a) {
-        const id = a.id_agente.toString();
-        const divId = 'retentionChart';
-        
-        if(!retentionData || !retentionData[id]) {
-            document.getElementById(divId).innerHTML = '<div style="display:flex;height:100%;align-items:center;justify-content:center;color:#94a3b8;">Sin datos de retención</div>';
-            return;
-        }
-        
-        const series = retentionData[id];
-        // Sort by month
-        series.sort((a, b) => a.mes.localeCompare(b.mes));
-        
-        const x_vals = series.map(d => d.mes);
-        const y_vals = series.map(d => d.tasa_retencion);
-        
-        const data = [{
-            x: x_vals,
-            y: y_vals,
-            type: 'scatter',
-            mode: 'lines+markers',
-            name: 'Retención %',
-            line: {color: '#8b5cf6', width: 3, shape: 'spline'},
-            marker: {size: 8, color: '#8b5cf6', line: {color: 'white', width: 2}},
-            fill: 'tozeroy',
-            fillcolor: 'rgba(139, 92, 246, 0.1)',
-            hovertemplate: '<b>%{x}</b><br>Retención: %{y:.1f}%<extra></extra>'
-        }];
-        
-        const layout = {
-            margin: { t: 20, b: 40, l: 40, r: 20 },
-            xaxis: { 
-                showgrid: false, 
-                tickfont: { size: 11, color: '#64748b' },
-                fixedrange: true
-            },
-            yaxis: { 
-                showgrid: true, 
-                gridcolor: '#f1f5f9', 
-                range: [0, 105],
-                tickfont: { size: 10, color: '#94a3b8' },
-                fixedrange: true
-            },
-            paper_bgcolor: 'rgba(0,0,0,0)',
-            plot_bgcolor: 'rgba(0,0,0,0)',
-            showlegend: false
-        };
-        
-        Plotly.newPlot(divId, data, layout, {displayModeBar: false, responsive: true});
-    }
 
-    function updateGrowthChart(a) {
-        const id = a.id_agente.toString();
-        const divId = 'growthChart';
-        
-        if(!growthData || !growthData[id]) {
-            document.getElementById(divId).innerHTML = '<div style="display:flex;height:100%;align-items:center;justify-content:center;color:#94a3b8;">Sin datos de crecimiento</div>';
-            return;
-        }
-        
-        const series = growthData[id];
-        series.sort((a, b) => a.mes.localeCompare(b.mes));
-        
-        const x_vals = series.map(d => d.mes);
-        const y_nuevos = series.map(d => d.nuevos);
-        const y_regresan = series.map(d => d.regresan);
-        
-        const data = [
-            {
-                x: x_vals, y: y_nuevos, name: 'Nuevos',
-                type: 'bar', marker: {color: '#10b981', cornerradius: 4}
-            },
-            {
-                x: x_vals, y: y_regresan, name: 'Recurrentes',
-                type: 'bar', marker: {color: '#3b82f6', cornerradius: 4}
-            }
-        ];
-        
-        const layout = {
-            barmode: 'stack',
-            margin: { t: 20, b: 40, l: 40, r: 20 },
-            xaxis: { 
-                showgrid: false, 
-                tickfont: { size: 11, color: '#64748b' },
-                fixedrange: true
-            },
-            yaxis: { 
-                showgrid: true, 
-                gridcolor: '#f1f5f9',
-                tickfont: { size: 10, color: '#94a3b8' },
-                fixedrange: true
-            },
-            legend: { orientation: 'h', y: -0.15 },
-            paper_bgcolor: 'rgba(0,0,0,0)',
-            plot_bgcolor: 'rgba(0,0,0,0)',
-        };
-        
-        Plotly.newPlot(divId, data, layout, {displayModeBar: false, responsive: true});
-    }
     
     function updateMonthlyTable(a) {
         const tbody = document.getElementById('monthlyTableBody');
@@ -1897,25 +1800,59 @@ def generate_html_report(df_agents, df_monthly=None, df_retention=None, df_growt
             
             const sorted = [...series].sort((a, b) => b.month.localeCompare(a.month));
             
+            if (sorted.length === 0) {
+                 tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding:20px; color:#94a3b8;">No hay historial mensual disponible</td></tr>';
+                 return;
+            }
+
             sorted.forEach(d => {
                 const tr = document.createElement('tr');
+                
+                // Safe accessors
+                const players = d.active_players !== undefined ? d.active_players : 0;
+                const score = d.score_global !== undefined ? d.score_global : 0;
+                const deps = d.total_depositos !== undefined ? d.total_depositos : 0;
+                const rets = d.total_retiros !== undefined ? d.total_retiros : 0;
+                const ggr = d.calculo_ggr !== undefined ? d.calculo_ggr : 0;
+                const ngr = d.calculo_ngr !== undefined ? d.calculo_ngr : 0;
+                const comis = d.calculo_comision !== undefined ? d.calculo_comision : 0;
+                
                 tr.innerHTML = `
                     <td>${d.month}</td>
-                    <td class="num-col">${new Intl.NumberFormat('en-US').format(d.total_depositos || 0)}</td>
-                    <td class="num-col">${new Intl.NumberFormat('en-US').format(d.total_retiros || 0)}</td>
-                    <td class="num-col">${new Intl.NumberFormat('en-US').format(d.calculo_ggr || 0)}</td>
-                    <td class="num-col">${new Intl.NumberFormat('en-US').format(d.calculo_ngr || 0)}</td>
-                    <td class="num-col"><strong>${new Intl.NumberFormat('en-US').format(d.calculo_comision || 0)}</strong></td>
+                    <td class="num-col">${new Intl.NumberFormat('en-US').format(players)}</td>
+                    <td class="num-col"><strong>${score.toFixed(2)}</strong></td>
+                    <td class="num-col">${new Intl.NumberFormat('en-US').format(deps)}</td>
+                    <td class="num-col">${new Intl.NumberFormat('en-US').format(rets)}</td>
+                    <td class="num-col">${new Intl.NumberFormat('en-US').format(ggr)}</td>
+                    <td class="num-col">${new Intl.NumberFormat('en-US').format(ngr)}</td>
+                    <td class="num-col"><strong>${new Intl.NumberFormat('en-US').format(comis)}</strong></td>
                 `;
                 tbody.appendChild(tr);
             });
         } else {
-            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">No hay datos disponibles</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding:20px; color:#94a3b8;">No hay datos disponibles para este agente</td></tr>';
         }
     }
 
     // Initial Load
-    updateTopAgencies();
+    document.addEventListener('DOMContentLoaded', () => {
+        updateTopAgencies();
+    });
+    
+    // Window Resize Handler
+    let resizeTimeout;
+    window.addEventListener('resize', function() {
+        clearTimeout(resizeTimeout);
+        resizeTimeout = setTimeout(function() {
+            const radarDiv = document.getElementById('radarChart');
+            const barDiv = document.getElementById('barChart');
+            const trendDiv = document.getElementById('trendChart');
+            
+            if (radarDiv) Plotly.Plots.resize(radarDiv);
+            if (barDiv) Plotly.Plots.resize(barDiv);
+            if (trendDiv) Plotly.Plots.resize(trendDiv);
+        }, 100);
+    });
 </script>
 </body>
 </html>
@@ -1933,8 +1870,8 @@ def generate_html_report(df_agents, df_monthly=None, df_retention=None, df_growt
         centroids_json=centroids_json,
         metrics_json=metrics_json,
         class_order_json=class_order_json,
-        retention_json=retention_json,
-        growth_json=growth_json
+        weights_json=weights_json,
+
     )
     
     os.makedirs(os.path.dirname(out_path), exist_ok=True)

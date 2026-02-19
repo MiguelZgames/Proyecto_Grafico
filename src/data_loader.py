@@ -13,8 +13,9 @@ def load_data(file_path):
         # Rename columns to match internal schema expected by metricas_agente.py
         # and subsequent reporting steps
         rename_map = {
+            'creado': 'creado', # fix potential conflict if date_evento is not found
             'date_evento': 'creado',
-            'comis_calculada': 'calculo_ngr',
+            'comis_calculada': 'calculo_comision', # Correct mapping per user
             'n_deposito': 'num_depositos',
             'n_retiro': 'num_retiros',
             'deposito': 'total_depositos',
@@ -27,7 +28,7 @@ def load_data(file_path):
         }
         
         # Check if required columns exist before renaming
-        missing_cols = [k for k in rename_map.keys() if k not in df.columns]
+        missing_cols = [k for k in rename_map.keys() if k not in df.columns and k != 'creado'] # 'creado' might be target
         if missing_cols:
             print(f"Warning: Missing columns in CSV: {missing_cols}")
             
@@ -42,16 +43,22 @@ def load_data(file_path):
         
         # Ensure numerical columns are floats/ints and fill NaNs
         numeric_cols = [
-            'calculo_ngr', 'num_depositos', 'num_retiros', 
+            'calculo_ngr', 'calculo_comision', # Added commission
+            'num_depositos', 'num_retiros', 
             'total_depositos', 'total_retiros', 
             'apuestas_deportivas_ggr', 'casino_ggr'
         ]
         
         for col in numeric_cols:
-            if col in df.columns:
-                df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
-            else:
+            if col not in df.columns:
                 df[col] = 0.0
+            
+            df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
+            
+        # Fallback: If calculo_ngr is 0 but calculo_comision has data, use commission as proxy for NGR logic
+        # strictly to preserve existing behavior where comis_calculada was mapped to ngr
+        if df['calculo_ngr'].sum() == 0 and df['calculo_comision'].sum() != 0:
+             df['calculo_ngr'] = df['calculo_comision']
 
         # Fill ID and Username NaNs
         if 'nombre_usuario_agente' in df.columns:

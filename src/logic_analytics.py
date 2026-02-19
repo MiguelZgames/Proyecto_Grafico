@@ -94,6 +94,7 @@ def calcular_metricas_agente(df_agente, total_jugadores_global=1):
     # Agrupar por mes
     df_mensual = df_agente.groupby('mes').agg({
         'calculo_ngr': 'sum',
+        'calculo_comision': 'sum', # Add commission aggregation
         'num_depositos': 'sum',
         'num_retiros': 'sum',
         'total_depositos': 'sum',
@@ -101,7 +102,7 @@ def calcular_metricas_agente(df_agente, total_jugadores_global=1):
         'apuestas_deportivas_ggr': 'sum',
         'casino_ggr': 'sum',
         'jugador_id': 'nunique'
-    }).reset_index()
+    }).reset_index().rename(columns={'jugador_id': 'active_players'})
 
     # Totales
     total_ngr = df_mensual['calculo_ngr'].sum()
@@ -171,7 +172,7 @@ def calcular_metricas_agente(df_agente, total_jugadores_global=1):
         elif val < 14: metricas['eficiencia_casino'] = 5
         elif val < 20: metricas['eficiencia_casino'] = 3
         elif val < 33: metricas['eficiencia_casino'] = 2
-        else: metricas['eficiencia_casino'] = max(0, 10 - (val/10))
+        else: metricas['eficiencia_casino'] = max(1.0, 10 - (val/10)) # Min 1.0 if active
 
     # 7. Eficiencia Deportes
     if total_ggr_deportes > 0:
@@ -181,7 +182,7 @@ def calcular_metricas_agente(df_agente, total_jugadores_global=1):
         elif val < 14: metricas['eficiencia_deportes'] = 5
         elif val < 20: metricas['eficiencia_deportes'] = 3
         elif val < 33: metricas['eficiencia_deportes'] = 2
-        else: metricas['eficiencia_deportes'] = max(0, 10 - (val/10))
+        else: metricas['eficiencia_deportes'] = max(1.0, 10 - (val/10)) # Min 1.0 if active
 
     # 8. Conversión
     if total_depositos > 0:
@@ -215,6 +216,134 @@ def calcular_metricas_agente(df_agente, total_jugadores_global=1):
         elif avg > 1000: metricas['calidad_jugadores'] = 4
         else: metricas['calidad_jugadores'] = 2
 
+    # --- CÁLCULO DE SCORE MENSUAL (HISTÓRICO) ---
+    scores_mensuales = []
+    
+    # Pre-calculate rolling/history context if needed, but for simplicity we treat each month as a snapshot
+    # for most metrics, and use simple windows for growth.
+    
+    for i, row in df_mensual.iterrows():
+        m_score = {}
+        
+        # Data Points
+        ngr = row['calculo_ngr']
+        deps = row['total_depositos']
+        num_deps = row['num_depositos']
+        num_rets = row['num_retiros']
+        ggr_c = row['casino_ggr']
+        ggr_d = row['apuestas_deportivas_ggr']
+        ggr_total = ggr_c + ggr_d
+        players = row['active_players']
+        
+        # 1. Rentabilidad
+        if deps > 0:
+            rent_pct = (ngr / deps) * 100
+            s_pct = 7.0 if rent_pct >= 8 else (5.5 if rent_pct >= 6 else (4.0 if rent_pct >= 4 else max(0, min(7, rent_pct * 1.75))))
+            s_vol = min(3.0, np.log10(ngr + 1) * 0.75) if ngr > 0 else 0
+            m_score['rentabilidad'] = s_pct + s_vol
+        else:
+            m_score['rentabilidad'] = 0
+            
+        # 2. Volumen
+        txs = num_deps + num_rets
+        m_score['volumen'] = min(10, max(0, np.log10(txs + 1) * 2.3)) if txs > 0 else 0
+        
+        # 3. Fidelidad (Vs Global Total passed to function)
+        if total_jugadores_global > 0:
+            m_score['fidelidad'] = min(10, (players / total_jugadores_global) * 100 * 2.5)
+        else:
+            m_score['fidelidad'] = 0
+            
+        # 4. Estabilidad (Snapshot = Neutral 5.0)
+        m_score['estabilidad'] = 5.0
+        
+        # 5. Crecimiento (Vs Prev Month)
+        if i > 0:
+            prev_deps = df_mensual.iloc[i-1]['num_depositos']
+            if prev_deps > 0:
+                pct = ((num_deps - prev_deps) / prev_deps) * 100
+                if pct >= 20: m_score['crecimiento'] = 10
+                elif pct >= 10: m_score['crecimiento'] = 8
+                elif pct >= 5: m_score['crecimiento'] = 6.5
+                elif pct >= 0: m_score['crecimiento'] = 5
+                elif pct >= -10: m_score['crecimiento'] = 3.5
+                elif pct >= -20: m_score['crecimiento'] = 2
+                else: m_score['crecimiento'] = 1
+            elif num_deps > 0:
+                m_score['crecimiento'] = 10
+            else:
+                m_score['crecimiento'] = 5
+        else:
+            m_score['crecimiento'] = 5.0
+            
+        # 6. Eficiencia Casino
+        if ggr_c > 0:
+            val = (num_deps / ggr_c) * 100
+            if val < 5.5: m_score['eficiencia_casino'] = 10
+            elif val < 10: m_score['eficiencia_casino'] = 7.5
+            elif val < 14: m_score['eficiencia_casino'] = 5
+            elif val < 20: m_score['eficiencia_casino'] = 3
+            elif val < 33: m_score['eficiencia_casino'] = 2
+            else: m_score['eficiencia_casino'] = max(1.0, 10 - (val/10))
+        else:
+             m_score['eficiencia_casino'] = 0
+             
+        # 7. Eficiencia Deportes
+        if ggr_d > 0:
+            val = (num_deps / ggr_d) * 100
+            if val < 5.5: m_score['eficiencia_deportes'] = 10
+            elif val < 10: m_score['eficiencia_deportes'] = 7.5
+            elif val < 14: m_score['eficiencia_deportes'] = 5
+            elif val < 20: m_score['eficiencia_deportes'] = 3
+            elif val < 33: m_score['eficiencia_deportes'] = 2
+            else: m_score['eficiencia_deportes'] = max(1.0, 10 - (val/10))
+        else:
+            m_score['eficiencia_deportes'] = 0
+            
+        # 8. Conversión
+        if deps > 0:
+            val = (ggr_total / deps) * 100
+            if val >= 15: m_score['eficiencia_conversion'] = 10
+            elif val >= 10: m_score['eficiencia_conversion'] = 7.5
+            elif val >= 7: m_score['eficiencia_conversion'] = 5
+            elif val >= 5: m_score['eficiencia_conversion'] = 3
+            else: m_score['eficiencia_conversion'] = max(0, val*2)
+        else:
+            m_score['eficiencia_conversion'] = 0
+            
+        # 9. Tendencia (Snapshot = Neutral 5.0)
+        m_score['tendencia'] = 5.0
+        
+        # 10. Diversificación
+        # Est. bets per type
+        bets_c = ggr_c / 0.05
+        bets_d = ggr_d / 0.05
+        total_bets = bets_c + bets_d
+        if total_bets > 0:
+            hhi = (bets_c/total_bets)**2 + (bets_d/total_bets)**2
+            m_score['diversificacion'] = (1 - hhi) * 10
+        else:
+            m_score['diversificacion'] = 0
+            
+        # 11. Calidad
+        if players > 0:
+            avg = total_bets / players
+            if avg > 10000: m_score['calidad_jugadores'] = 8
+            elif avg > 5000: m_score['calidad_jugadores'] = 6
+            elif avg > 1000: m_score['calidad_jugadores'] = 4
+            else: m_score['calidad_jugadores'] = 2
+        else:
+            m_score['calidad_jugadores'] = 0
+            
+        # Calculate Weighted Score
+        total_s = 0
+        for k, weight in PESOS_METRICAS.items():
+            total_s += m_score.get(k, 0) * weight
+            
+        scores_mensuales.append(total_s)
+
+    df_mensual['score_global'] = scores_mensuales
+    
     return metricas, df_mensual
 
 # ============================================================================
@@ -240,91 +369,7 @@ def categorizar_agente(score):
 # LÓGICA DE ANÁLISIS PROFUNDO (De dashboard_agentes_limpio1.py)
 # ============================================================================
 
-def analizar_retencion_cohortes(df_agente):
-    """
-    Analiza la retención de jugadores mes a mes.
-    Retorna DataFrame con tasas de retención.
-    """
-    if 'creado' not in df_agente.columns or len(df_agente) == 0:
-        return None
-    
-    df = df_agente.copy()
-    df['creado'] = pd.to_datetime(df['creado'])
-    df = df.dropna(subset=['creado'])
-    df['periodo'] = df['creado'].dt.to_period('M')
-    
-    jugadores_por_mes = {}
-    for mes in sorted(df['periodo'].unique()):
-        jugadores_por_mes[mes] = set(df[df['periodo'] == mes]['jugador_id'].unique())
-        
-    meses_ordenados = sorted(jugadores_por_mes.keys())
-    resultados = []
-    
-    for i in range(1, len(meses_ordenados)):
-        mes_ant = meses_ordenados[i-1]
-        mes_act = meses_ordenados[i]
-        
-        set_ant = jugadores_por_mes[mes_ant]
-        set_act = jugadores_por_mes[mes_act]
-        
-        retenidos = set_ant.intersection(set_act)
-        tasa = (len(retenidos) / len(set_ant)) * 100 if len(set_ant) > 0 else 0
-        
-        resultados.append({
-            'mes': str(mes_act),
-            'jugadores_anteriores': len(set_ant),
-            'jugadores_actuales': len(set_act),
-            'retenidos': len(retenidos),
-            'tasa_retencion': round(tasa, 2)
-        })
-        
-    return pd.DataFrame(resultados) if resultados else None
 
-def analizar_crecimiento_organico(df_agente):
-    """
-    Analiza crecimiento orgánico vs retorno.
-    """
-    if 'creado' not in df_agente.columns or len(df_agente) == 0:
-        return None
-        
-    df = df_agente.copy()
-    df['creado'] = pd.to_datetime(df['creado'])
-    df = df.dropna(subset=['creado'])
-    df['periodo'] = df['creado'].dt.to_period('M')
-    
-    jugadores_por_mes = {}
-    for mes in sorted(df['periodo'].unique()):
-        jugadores_por_mes[mes] = set(df[df['periodo'] == mes]['jugador_id'].unique())
-        
-    meses_ordenados = sorted(jugadores_por_mes.keys())
-    historico = set()
-    resultados = []
-    
-    for i, mes in enumerate(meses_ordenados):
-        actuales = jugadores_por_mes[mes]
-        
-        if i == 0:
-            nuevos = actuales
-            regresan = set()
-            historico = actuales.copy()
-        else:
-            nuevos = actuales - historico
-            # Regresan: estuvieron antes, no el mes pasado (simplificación: en este set, regresan son los que no son nuevos)
-            # Definición 'limpio1': Regresan = (Actuales - MesAnterior) - Nuevos
-            mes_ant = meses_ordenados[i-1]
-            anteriores = jugadores_por_mes[mes_ant]
-            regresan = (actuales - anteriores) - nuevos
-            historico.update(actuales)
-            
-        resultados.append({
-            'mes': str(mes),
-            'total': len(actuales),
-            'nuevos': len(nuevos),
-            'regresan': len(regresan),
-            'pct_nuevos': round(len(nuevos)/len(actuales)*100, 1) if len(actuales) > 0 else 0
-        })
-        
-    return pd.DataFrame(resultados) if resultados else None
 
 # ============================================================================
 # LÓGICA DE CRÉDITO Y PREDICCIÓN
