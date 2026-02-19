@@ -1373,9 +1373,22 @@
                 if (!compAgent) return;
                 
                 // Radar Part
-                const weights = window.weightsData || {}; 
-                const compRawVals = metricKeys.map(key => compAgent[key] || 0);
-                compRawVals.push(compRawVals[0]); 
+                const weights = window.globalWeights || (typeof globalWeights !== 'undefined' ? globalWeights : {}); 
+                
+                // Calculate detailed data for Radar tooltip
+                const compChartData = metricKeys.map(key => {
+                    const rawVal = compAgent[key] || 0;
+                    const weight = weights[key] || 0;
+                    const contribution = rawVal * weight;
+                    return { key, rawVal, weight, contribution };
+                });
+                
+                const compRawVals = compChartData.map(d => d.rawVal);
+                compRawVals.push(compRawVals[0]); // Close loop
+                
+                // Custom Data for Radar: [Weight, Impact]
+                const compRadarCustomData = compChartData.map(d => [d.weight, d.contribution]);
+                compRadarCustomData.push([compChartData[0].weight, compChartData[0].contribution]); // Close loop
                 
                 const color = compareColors[idx % compareColors.length];
                 const compName = compAgent.nombre_usuario_agente || `Agente ${compId}`;
@@ -1389,12 +1402,27 @@
                     name: compName,
                     line: {color: color, width: 2, dash: 'dot'},
                     marker: {size: 4, color: color},
-                    hovertemplate: `<b>${compName}</b><br>%{theta}: %{r:.1f} / 10<br><extra></extra>`,
+                    hovertemplate: 
+                        `<b>${compName}</b><br>` +
+                        '%{theta}<br>' +
+                        'Score: %{r:.1f} / 10<br>' +
+                        'Peso: %{customdata[0]:.0%}<br>' +
+                        'Impacto: %{customdata[1]:.2f} pts<br>' +
+                        '<extra></extra>',
+                    customdata: compRadarCustomData,
                     showlegend: false 
                 });
 
                 // Bar Part - Map values to match the sorted order of the main agent
                 const compBarValues = barDataSorted.map(d => compAgent[d.key] || 0).reverse();
+                
+                // Calculate detailed data for Bar tooltip (Gap Analysis)
+                const compBarMeta = barDataSorted.map(d => {
+                    const rawVal = compAgent[d.key] || 0;
+                    const gap = 10 - rawVal;
+                    const weightedGap = gap * d.weight;
+                    return [d.weight, weightedGap];
+                }).reverse();
                 
                 barData.push({
                     x: compBarValues,
@@ -1406,7 +1434,14 @@
                     text: compBarValues.map(v => v.toFixed(1)),
                     textposition: 'auto',
                     textfont: { family: 'Inter', color: 'white', size: 10 },
-                    hovertemplate: `<b>${compName}</b><br>%{y}: %{x:.1f} / 10<br><extra></extra>`,
+                    hovertemplate: 
+                        `<b>${compName}</b><br>` +
+                        '%{y}<br>' +
+                        'Score: %{x:.1f} / 10<br>' +
+                        'Peso: %{customdata[0]:.0%}<br>' +
+                        'Oportunidad: +%{customdata[1]:.2f} pts globales<br>' +
+                        '<extra></extra>',
+                    customdata: compBarMeta,
                     showlegend: false
                 });
             });
