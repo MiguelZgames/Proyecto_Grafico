@@ -218,6 +218,7 @@ def calcular_metricas_agente(df_agente, total_jugadores_global=1):
 
     # --- CÁLCULO DE SCORE MENSUAL (HISTÓRICO) ---
     scores_mensuales = []
+    all_monthly_metrics = []  # Store per-month metric dicts
     
     # Pre-calculate rolling/history context if needed, but for simplicity we treat each month as a snapshot
     # for most metrics, and use simple windows for growth.
@@ -279,11 +280,11 @@ def calcular_metricas_agente(df_agente, total_jugadores_global=1):
         # 6. Eficiencia Casino
         if ggr_c > 0:
             val = (num_deps / ggr_c) * 100
-            if val < 5.5: m_score['eficiencia_casino'] = 10
-            elif val < 10: m_score['eficiencia_casino'] = 7.5
-            elif val < 14: m_score['eficiencia_casino'] = 5
-            elif val < 20: m_score['eficiencia_casino'] = 3
-            elif val < 33: m_score['eficiencia_casino'] = 2
+            if val > 5.5: m_score['eficiencia_casino'] = 10
+            elif val > 10: m_score['eficiencia_casino'] = 7.5
+            elif val > 14: m_score['eficiencia_casino'] = 5
+            elif val > 20: m_score['eficiencia_casino'] = 3
+            elif val > 33: m_score['eficiencia_casino'] = 2
             else: m_score['eficiencia_casino'] = max(1.0, 10 - (val/10))
         else:
              m_score['eficiencia_casino'] = 0
@@ -291,11 +292,11 @@ def calcular_metricas_agente(df_agente, total_jugadores_global=1):
         # 7. Eficiencia Deportes
         if ggr_d > 0:
             val = (num_deps / ggr_d) * 100
-            if val < 5.5: m_score['eficiencia_deportes'] = 10
-            elif val < 10: m_score['eficiencia_deportes'] = 7.5
-            elif val < 14: m_score['eficiencia_deportes'] = 5
-            elif val < 20: m_score['eficiencia_deportes'] = 3
-            elif val < 33: m_score['eficiencia_deportes'] = 2
+            if val > 5.5: m_score['eficiencia_deportes'] = 10
+            elif val > 10: m_score['eficiencia_deportes'] = 7.5
+            elif val > 14: m_score['eficiencia_deportes'] = 5
+            elif val > 20: m_score['eficiencia_deportes'] = 3
+            elif val > 33: m_score['eficiencia_deportes'] = 2
             else: m_score['eficiencia_deportes'] = max(1.0, 10 - (val/10))
         else:
             m_score['eficiencia_deportes'] = 0
@@ -341,8 +342,23 @@ def calcular_metricas_agente(df_agente, total_jugadores_global=1):
             total_s += m_score.get(k, 0) * weight
             
         scores_mensuales.append(total_s)
+        all_monthly_metrics.append(m_score)
 
     df_mensual['score_global'] = scores_mensuales
+    
+    # Store individual metric scores per month
+    for metric_key in PESOS_METRICAS.keys():
+        df_mensual[metric_key] = [m.get(metric_key, 0) for m in all_monthly_metrics]
+    
+    # Add Clase and Risk_Safe per month
+    clases = []
+    risk_flags = []
+    for s in scores_mensuales:
+        cat, _ = categorizar_agente(s)
+        clases.append(cat)
+        risk_flags.append(1 if 'A' in cat or 'B' in cat else 0)
+    df_mensual['Clase'] = clases
+    df_mensual['Risk_Safe'] = risk_flags
     
     return metricas, df_mensual
 
@@ -354,15 +370,15 @@ def calcular_score_total(metricas):
     return sum(v * PESOS_METRICAS.get(k, 0) for k, v in metricas.items())
 
 def categorizar_agente(score):
-    if score >= 9.0: return "A+++", "Excelencia excepcional"
-    elif score >= 8.5: return "A++", "Excelencia alta"
-    elif score >= 8.0: return "A+", "Excelencia"
-    elif score >= 7.0: return "B+++", "Consolidado superior"
-    elif score >= 6.5: return "B++", "Consolidado alto"
-    elif score >= 6.0: return "B+", "Consolidado"
-    elif score >= 5.0: return "C+++", "En desarrollo avanzado"
-    elif score >= 4.0: return "C++", "En desarrollo medio"
-    elif score >= 3.0: return "C+", "Principiante"
+    if score >= 8.5: return "A+++", "Excelencia excepcional"
+    elif score >= 8.0: return "A++", "Excelencia alta"
+    elif score >= 7.5: return "A+", "Excelencia"
+    elif score >= 6.5: return "B+++", "Consolidado superior"
+    elif score >= 5.5: return "B++", "Consolidado alto"
+    elif score >= 4.5: return "B+", "Consolidado"
+    elif score >= 3.5: return "C+++", "En desarrollo avanzado"
+    elif score >= 2.5: return "C++", "En desarrollo medio"
+    elif score >= 1.5: return "C+", "Principiante"
     else: return "C", "Crítico"
 
 # ============================================================================

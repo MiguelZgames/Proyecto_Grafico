@@ -1,0 +1,767 @@
+================================================================================
+  ANÁLISIS DETALLADO DE MÉTRICAS — SortiOficial
+================================================================================
+
+Total Rows: 28386
+Agent ID: 718
+Total Jugadores Global: 9908
+Meses disponibles: 8
+
+────────────────────────────────────────────────────────────────────────────────
+  RESUMEN GLOBAL (Todos los meses agregados)
+────────────────────────────────────────────────────────────────────────────────
+  Score Global: 6.1123
+  Clase: B++ — Consolidado alto
+
+  Métrica                   Score (0-10)     Peso   Contribución
+  ───────────────────────── ──────────── ──────── ──────────────
+  rentabilidad                    7.0721     0.12         0.8486
+  volumen                        10.0000     0.15         1.5000
+  fidelidad                      10.0000     0.15         1.5000
+  estabilidad                     5.9206     0.12         0.7105
+  crecimiento                     1.0000     0.10         0.1000
+  eficiencia_casino               1.0000     0.08         0.0800
+  eficiencia_deportes             2.0000     0.08         0.1600
+  eficiencia_conversion           7.5000     0.11         0.8250
+  tendencia                       6.0000     0.04         0.2400
+  diversificacion                 2.2743     0.03         0.0682
+  calidad_jugadores               4.0000     0.02         0.0800
+  ───────────────────────── ──────────── ──────── ──────────────
+  TOTAL                                      1.00         6.1123
+
+
+================================================================================
+  DETALLE MES A MES
+================================================================================
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  📅 MES: 2025-07  |  Score: 3.5574  |  Clase: C+++  |  Risk: Riesgo
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  📊 DATOS CRUDOS DEL MES:
+    NGR (calculo_ngr):                   117.93
+    Comisión (calculo_comision):          117.93
+    Total Depósitos ($):               28,099.83
+    Num. Depósitos (txn):                  1,007
+    Total Retiros ($):                -23,490.37
+    Num. Retiros (txn):                      335
+    GGR Casino:                             0.00
+    GGR Deportes:                         589.64
+    GGR Total:                            589.64
+    Jugadores Activos:                        85
+    Apuestas Est. Casino:                   0.00
+    Apuestas Est. Deportes:            11,792.80
+    Apuestas Est. Total:               11,792.80
+
+  ⚙️  CÁLCULOS DETALLADOS POR MÉTRICA:
+
+  1️⃣  RENTABILIDAD (Peso: 0.12)
+     Fórmula: (NGR / Depósitos) * 100 = (117.93 / 28,099.83) * 100 = 0.4197%
+     Condición: else → score_pct = max(0, min(7, 0.4197 * 1.75)) = 0.7344
+     Bonus volumen: min(3.0, log10(117.93+1) * 0.75) = 1.5565
+     ✅ Score = 0.7344 + 1.5565 = 2.2909
+
+  2️⃣  VOLUMEN (Peso: 0.15)
+     Fórmula: min(10, max(0, log10(1342+1) * 2.3)) = 7.1946
+     ✅ Score = 7.1946
+
+  3️⃣  FIDELIDAD (Peso: 0.15)
+     Fórmula: min(10, (85 / 9908) * 100 * 2.5) = 2.1447
+     ✅ Score = 2.1447
+
+  4️⃣  ESTABILIDAD (Peso: 0.12)
+     Snapshot mensual → Score = 5.0 (neutral)
+     ✅ Score = 5.0000
+
+  5️⃣  CRECIMIENTO (Peso: 0.10)
+     Primer mes → Score = 5.0 (default)
+     ✅ Score = 5.0000
+
+  6️⃣  EFICIENCIA CASINO (Peso: 0.08)
+     GGR Casino <= 0 → Score = 0
+     ✅ Score = 0.0000
+
+  7️⃣  EFICIENCIA DEPORTES (Peso: 0.08)
+     Fórmula: (1007 / 589.64) * 100 = 170.7822
+     Condición: val=170.7822 → Score = 1.0
+     ✅ Score = 1.0000
+
+  8️⃣  CONVERSIÓN (Peso: 0.11)
+     Fórmula: (589.64 / 28,099.83) * 100 = 2.0984%
+     Condición: val=2.0984% → Score = 4.196751368246714
+     ✅ Score = 4.1968
+
+  9️⃣  TENDENCIA (Peso: 0.04)
+     Snapshot mensual → Score = 5.0 (neutral)
+     ✅ Score = 5.0000
+
+  🔟  DIVERSIFICACIÓN (Peso: 0.03)
+     Casino bets: 0.00, Deportes bets: 11,792.80
+     HHI = (0.00/11,792.80)² + (11,792.80/11,792.80)² = 1.000000
+     Fórmula: (1 - 1.000000) * 10 = 0.0000
+     ✅ Score = 0.0000
+
+  1️⃣1️⃣ CALIDAD JUGADORES (Peso: 0.02)
+     Fórmula: Apuestas / Jugadores = 11,792.80 / 85 = 138.74
+     Condición: avg=138.74 → Score = 2
+     ✅ Score = 2.0000
+
+  📋 RESUMEN DEL MES 2025-07:
+  Métrica                      Score     Peso   Contribución
+  ───────────────────────── ──────── ──────── ──────────────
+  rentabilidad                2.2909     0.12         0.2749
+  volumen                     7.1946     0.15         1.0792
+  fidelidad                   2.1447     0.15         0.3217
+  estabilidad                 5.0000     0.12         0.6000
+  crecimiento                 5.0000     0.10         0.5000
+  eficiencia_casino           0.0000     0.08         0.0000
+  eficiencia_deportes         1.0000     0.08         0.0800
+  eficiencia_conversion       4.1968     0.11         0.4616
+  tendencia                   5.0000     0.04         0.2000
+  diversificacion             0.0000     0.03         0.0000
+  calidad_jugadores           2.0000     0.02         0.0400
+  ───────────────────────── ──────── ──────── ──────────────
+  SCORE MES                   3.5574                  3.5574
+  Clase: C+++  |  Risk: Riesgo
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  📅 MES: 2025-08  |  Score: 6.2603  |  Clase: B++  |  Risk: Seguro
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  📊 DATOS CRUDOS DEL MES:
+    NGR (calculo_ngr):                 2,707.63
+    Comisión (calculo_comision):        2,707.63
+    Total Depósitos ($):               62,844.50
+    Num. Depósitos (txn):                  2,739
+    Total Retiros ($):                -47,583.42
+    Num. Retiros (txn):                      544
+    GGR Casino:                             0.00
+    GGR Deportes:                      13,538.13
+    GGR Total:                         13,538.13
+    Jugadores Activos:                       306
+    Apuestas Est. Casino:                   0.00
+    Apuestas Est. Deportes:           270,762.60
+    Apuestas Est. Total:              270,762.60
+
+  ⚙️  CÁLCULOS DETALLADOS POR MÉTRICA:
+
+  1️⃣  RENTABILIDAD (Peso: 0.12)
+     Fórmula: (NGR / Depósitos) * 100 = (2,707.63 / 62,844.50) * 100 = 4.3085%
+     Condición: rent_pct >= 4 → score_pct = 4.0
+     Bonus volumen: min(3.0, log10(2,707.63+1) * 0.75) = 2.5746
+     ✅ Score = 4.0000 + 2.5746 = 6.5746
+
+  2️⃣  VOLUMEN (Peso: 0.15)
+     Fórmula: min(10, max(0, log10(3283+1) * 2.3)) = 8.0877
+     ✅ Score = 8.0877
+
+  3️⃣  FIDELIDAD (Peso: 0.15)
+     Fórmula: min(10, (306 / 9908) * 100 * 2.5) = 7.7210
+     ✅ Score = 7.7210
+
+  4️⃣  ESTABILIDAD (Peso: 0.12)
+     Snapshot mensual → Score = 5.0 (neutral)
+     ✅ Score = 5.0000
+
+  5️⃣  CRECIMIENTO (Peso: 0.10)
+     Fórmula: ((2739 - 1007) / 1007) * 100 = 172.00%
+     Condición: pct=172.00% → Score = 10
+     ✅ Score = 10.0000
+
+  6️⃣  EFICIENCIA CASINO (Peso: 0.08)
+     GGR Casino <= 0 → Score = 0
+     ✅ Score = 0.0000
+
+  7️⃣  EFICIENCIA DEPORTES (Peso: 0.08)
+     Fórmula: (2739 / 13,538.13) * 100 = 20.2317
+     Condición: val=20.2317 → Score = 2
+     ✅ Score = 2.0000
+
+  8️⃣  CONVERSIÓN (Peso: 0.11)
+     Fórmula: (13,538.13 / 62,844.50) * 100 = 21.5423%
+     Condición: val=21.5423% → Score = 10
+     ✅ Score = 10.0000
+
+  9️⃣  TENDENCIA (Peso: 0.04)
+     Snapshot mensual → Score = 5.0 (neutral)
+     ✅ Score = 5.0000
+
+  🔟  DIVERSIFICACIÓN (Peso: 0.03)
+     Casino bets: 0.00, Deportes bets: 270,762.60
+     HHI = (0.00/270,762.60)² + (270,762.60/270,762.60)² = 1.000000
+     Fórmula: (1 - 1.000000) * 10 = 0.0000
+     ✅ Score = 0.0000
+
+  1️⃣1️⃣ CALIDAD JUGADORES (Peso: 0.02)
+     Fórmula: Apuestas / Jugadores = 270,762.60 / 306 = 884.85
+     Condición: avg=884.85 → Score = 2
+     ✅ Score = 2.0000
+
+  📋 RESUMEN DEL MES 2025-08:
+  Métrica                      Score     Peso   Contribución
+  ───────────────────────── ──────── ──────── ──────────────
+  rentabilidad                6.5746     0.12         0.7889
+  volumen                     8.0877     0.15         1.2132
+  fidelidad                   7.7210     0.15         1.1582
+  estabilidad                 5.0000     0.12         0.6000
+  crecimiento                10.0000     0.10         1.0000
+  eficiencia_casino           0.0000     0.08         0.0000
+  eficiencia_deportes         2.0000     0.08         0.1600
+  eficiencia_conversion      10.0000     0.11         1.1000
+  tendencia                   5.0000     0.04         0.2000
+  diversificacion             0.0000     0.03         0.0000
+  calidad_jugadores           2.0000     0.02         0.0400
+  ───────────────────────── ──────── ──────── ──────────────
+  SCORE MES                   6.2603                  6.2603
+  Clase: B++  |  Risk: Seguro
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  📅 MES: 2025-09  |  Score: 4.6650  |  Clase: B+  |  Risk: Seguro
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  📊 DATOS CRUDOS DEL MES:
+    NGR (calculo_ngr):                -1,544.00
+    Comisión (calculo_comision):       -1,544.00
+    Total Depósitos ($):              190,981.45
+    Num. Depósitos (txn):                  5,507
+    Total Retiros ($):               -172,588.77
+    Num. Retiros (txn):                    1,420
+    GGR Casino:                             0.00
+    GGR Deportes:                      -7,720.01
+    GGR Total:                         -7,720.01
+    Jugadores Activos:                       501
+    Apuestas Est. Casino:                   0.00
+    Apuestas Est. Deportes:          -154,400.20
+    Apuestas Est. Total:             -154,400.20
+
+  ⚙️  CÁLCULOS DETALLADOS POR MÉTRICA:
+
+  1️⃣  RENTABILIDAD (Peso: 0.12)
+     Fórmula: (NGR / Depósitos) * 100 = (-1,544.00 / 190,981.45) * 100 = -0.8085%
+     Condición: else → score_pct = max(0, min(7, -0.8085 * 1.75)) = 0.0000
+     Bonus volumen: NGR <= 0 → 0
+     ✅ Score = 0.0000 + 0.0000 = 0.0000
+
+  2️⃣  VOLUMEN (Peso: 0.15)
+     Fórmula: min(10, max(0, log10(6927+1) * 2.3)) = 8.8334
+     ✅ Score = 8.8334
+
+  3️⃣  FIDELIDAD (Peso: 0.15)
+     Fórmula: min(10, (501 / 9908) * 100 * 2.5) = 10.0000
+     ✅ Score = 10.0000
+
+  4️⃣  ESTABILIDAD (Peso: 0.12)
+     Snapshot mensual → Score = 5.0 (neutral)
+     ✅ Score = 5.0000
+
+  5️⃣  CRECIMIENTO (Peso: 0.10)
+     Fórmula: ((5507 - 2739) / 2739) * 100 = 101.06%
+     Condición: pct=101.06% → Score = 10
+     ✅ Score = 10.0000
+
+  6️⃣  EFICIENCIA CASINO (Peso: 0.08)
+     GGR Casino <= 0 → Score = 0
+     ✅ Score = 0.0000
+
+  7️⃣  EFICIENCIA DEPORTES (Peso: 0.08)
+     GGR Deportes <= 0 → Score = 0
+     ✅ Score = 0.0000
+
+  8️⃣  CONVERSIÓN (Peso: 0.11)
+     Fórmula: (-7,720.01 / 190,981.45) * 100 = -4.0423%
+     Condición: val=-4.0423% → Score = 0
+     ✅ Score = 0.0000
+
+  9️⃣  TENDENCIA (Peso: 0.04)
+     Snapshot mensual → Score = 5.0 (neutral)
+     ✅ Score = 5.0000
+
+  🔟  DIVERSIFICACIÓN (Peso: 0.03)
+     Total apuestas = 0 → Score = 0
+     ✅ Score = 0.0000
+
+  1️⃣1️⃣ CALIDAD JUGADORES (Peso: 0.02)
+     Fórmula: Apuestas / Jugadores = -154,400.20 / 501 = -308.18
+     Condición: avg=-308.18 → Score = 2
+     ✅ Score = 2.0000
+
+  📋 RESUMEN DEL MES 2025-09:
+  Métrica                      Score     Peso   Contribución
+  ───────────────────────── ──────── ──────── ──────────────
+  rentabilidad                0.0000     0.12         0.0000
+  volumen                     8.8334     0.15         1.3250
+  fidelidad                  10.0000     0.15         1.5000
+  estabilidad                 5.0000     0.12         0.6000
+  crecimiento                10.0000     0.10         1.0000
+  eficiencia_casino           0.0000     0.08         0.0000
+  eficiencia_deportes         0.0000     0.08         0.0000
+  eficiencia_conversion       0.0000     0.11         0.0000
+  tendencia                   5.0000     0.04         0.2000
+  diversificacion             0.0000     0.03         0.0000
+  calidad_jugadores           2.0000     0.02         0.0400
+  ───────────────────────── ──────── ──────── ──────────────
+  SCORE MES                   4.6650                  4.6650
+  Clase: B+  |  Risk: Seguro
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  📅 MES: 2025-10  |  Score: 3.9070  |  Clase: C+++  |  Risk: Riesgo
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  📊 DATOS CRUDOS DEL MES:
+    NGR (calculo_ngr):                -6,758.82
+    Comisión (calculo_comision):       -6,758.82
+    Total Depósitos ($):              238,366.35
+    Num. Depósitos (txn):                  5,505
+    Total Retiros ($):               -240,925.32
+    Num. Retiros (txn):                    1,384
+    GGR Casino:                             0.00
+    GGR Deportes:                     -33,794.08
+    GGR Total:                        -33,794.08
+    Jugadores Activos:                       368
+    Apuestas Est. Casino:                   0.00
+    Apuestas Est. Deportes:          -675,881.60
+    Apuestas Est. Total:             -675,881.60
+
+  ⚙️  CÁLCULOS DETALLADOS POR MÉTRICA:
+
+  1️⃣  RENTABILIDAD (Peso: 0.12)
+     Fórmula: (NGR / Depósitos) * 100 = (-6,758.82 / 238,366.35) * 100 = -2.8355%
+     Condición: else → score_pct = max(0, min(7, -2.8355 * 1.75)) = 0.0000
+     Bonus volumen: NGR <= 0 → 0
+     ✅ Score = 0.0000 + 0.0000 = 0.0000
+
+  2️⃣  VOLUMEN (Peso: 0.15)
+     Fórmula: min(10, max(0, log10(6889+1) * 2.3)) = 8.8279
+     ✅ Score = 8.8279
+
+  3️⃣  FIDELIDAD (Peso: 0.15)
+     Fórmula: min(10, (368 / 9908) * 100 * 2.5) = 9.2854
+     ✅ Score = 9.2854
+
+  4️⃣  ESTABILIDAD (Peso: 0.12)
+     Snapshot mensual → Score = 5.0 (neutral)
+     ✅ Score = 5.0000
+
+  5️⃣  CRECIMIENTO (Peso: 0.10)
+     Fórmula: ((5505 - 5507) / 5507) * 100 = -0.04%
+     Condición: pct=-0.04% → Score = 3.5
+     ✅ Score = 3.5000
+
+  6️⃣  EFICIENCIA CASINO (Peso: 0.08)
+     GGR Casino <= 0 → Score = 0
+     ✅ Score = 0.0000
+
+  7️⃣  EFICIENCIA DEPORTES (Peso: 0.08)
+     GGR Deportes <= 0 → Score = 0
+     ✅ Score = 0.0000
+
+  8️⃣  CONVERSIÓN (Peso: 0.11)
+     Fórmula: (-33,794.08 / 238,366.35) * 100 = -14.1774%
+     Condición: val=-14.1774% → Score = 0
+     ✅ Score = 0.0000
+
+  9️⃣  TENDENCIA (Peso: 0.04)
+     Snapshot mensual → Score = 5.0 (neutral)
+     ✅ Score = 5.0000
+
+  🔟  DIVERSIFICACIÓN (Peso: 0.03)
+     Total apuestas = 0 → Score = 0
+     ✅ Score = 0.0000
+
+  1️⃣1️⃣ CALIDAD JUGADORES (Peso: 0.02)
+     Fórmula: Apuestas / Jugadores = -675,881.60 / 368 = -1,836.63
+     Condición: avg=-1,836.63 → Score = 2
+     ✅ Score = 2.0000
+
+  📋 RESUMEN DEL MES 2025-10:
+  Métrica                      Score     Peso   Contribución
+  ───────────────────────── ──────── ──────── ──────────────
+  rentabilidad                0.0000     0.12         0.0000
+  volumen                     8.8279     0.15         1.3242
+  fidelidad                   9.2854     0.15         1.3928
+  estabilidad                 5.0000     0.12         0.6000
+  crecimiento                 3.5000     0.10         0.3500
+  eficiencia_casino           0.0000     0.08         0.0000
+  eficiencia_deportes         0.0000     0.08         0.0000
+  eficiencia_conversion       0.0000     0.11         0.0000
+  tendencia                   5.0000     0.04         0.2000
+  diversificacion             0.0000     0.03         0.0000
+  calidad_jugadores           2.0000     0.02         0.0400
+  ───────────────────────── ──────── ──────── ──────────────
+  SCORE MES                   3.9070                  3.9070
+  Clase: C+++  |  Risk: Riesgo
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  📅 MES: 2025-11  |  Score: 6.7671  |  Clase: B+++  |  Risk: Seguro
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  📊 DATOS CRUDOS DEL MES:
+    NGR (calculo_ngr):                16,254.86
+    Comisión (calculo_comision):       16,254.86
+    Total Depósitos ($):              240,040.65
+    Num. Depósitos (txn):                  5,205
+    Total Retiros ($):               -177,119.05
+    Num. Retiros (txn):                    1,364
+    GGR Casino:                             0.00
+    GGR Deportes:                      81,274.28
+    GGR Total:                         81,274.28
+    Jugadores Activos:                       515
+    Apuestas Est. Casino:                   0.00
+    Apuestas Est. Deportes:         1,625,485.60
+    Apuestas Est. Total:            1,625,485.60
+
+  ⚙️  CÁLCULOS DETALLADOS POR MÉTRICA:
+
+  1️⃣  RENTABILIDAD (Peso: 0.12)
+     Fórmula: (NGR / Depósitos) * 100 = (16,254.86 / 240,040.65) * 100 = 6.7717%
+     Condición: rent_pct >= 6 → score_pct = 5.5
+     Bonus volumen: min(3.0, log10(16,254.86+1) * 0.75) = 3.0000
+     ✅ Score = 5.5000 + 3.0000 = 8.5000
+
+  2️⃣  VOLUMEN (Peso: 0.15)
+     Fórmula: min(10, max(0, log10(6569+1) * 2.3)) = 8.7804
+     ✅ Score = 8.7804
+
+  3️⃣  FIDELIDAD (Peso: 0.15)
+     Fórmula: min(10, (515 / 9908) * 100 * 2.5) = 10.0000
+     ✅ Score = 10.0000
+
+  4️⃣  ESTABILIDAD (Peso: 0.12)
+     Snapshot mensual → Score = 5.0 (neutral)
+     ✅ Score = 5.0000
+
+  5️⃣  CRECIMIENTO (Peso: 0.10)
+     Fórmula: ((5205 - 5505) / 5505) * 100 = -5.45%
+     Condición: pct=-5.45% → Score = 3.5
+     ✅ Score = 3.5000
+
+  6️⃣  EFICIENCIA CASINO (Peso: 0.08)
+     GGR Casino <= 0 → Score = 0
+     ✅ Score = 0.0000
+
+  7️⃣  EFICIENCIA DEPORTES (Peso: 0.08)
+     Fórmula: (5205 / 81,274.28) * 100 = 6.4042
+     Condición: val=6.4042 → Score = 7.5
+     ✅ Score = 7.5000
+
+  8️⃣  CONVERSIÓN (Peso: 0.11)
+     Fórmula: (81,274.28 / 240,040.65) * 100 = 33.8585%
+     Condición: val=33.8585% → Score = 10
+     ✅ Score = 10.0000
+
+  9️⃣  TENDENCIA (Peso: 0.04)
+     Snapshot mensual → Score = 5.0 (neutral)
+     ✅ Score = 5.0000
+
+  🔟  DIVERSIFICACIÓN (Peso: 0.03)
+     Casino bets: 0.00, Deportes bets: 1,625,485.60
+     HHI = (0.00/1,625,485.60)² + (1,625,485.60/1,625,485.60)² = 1.000000
+     Fórmula: (1 - 1.000000) * 10 = 0.0000
+     ✅ Score = 0.0000
+
+  1️⃣1️⃣ CALIDAD JUGADORES (Peso: 0.02)
+     Fórmula: Apuestas / Jugadores = 1,625,485.60 / 515 = 3,156.28
+     Condición: avg=3,156.28 → Score = 4
+     ✅ Score = 4.0000
+
+  📋 RESUMEN DEL MES 2025-11:
+  Métrica                      Score     Peso   Contribución
+  ───────────────────────── ──────── ──────── ──────────────
+  rentabilidad                8.5000     0.12         1.0200
+  volumen                     8.7804     0.15         1.3171
+  fidelidad                  10.0000     0.15         1.5000
+  estabilidad                 5.0000     0.12         0.6000
+  crecimiento                 3.5000     0.10         0.3500
+  eficiencia_casino           0.0000     0.08         0.0000
+  eficiencia_deportes         7.5000     0.08         0.6000
+  eficiencia_conversion      10.0000     0.11         1.1000
+  tendencia                   5.0000     0.04         0.2000
+  diversificacion             0.0000     0.03         0.0000
+  calidad_jugadores           4.0000     0.02         0.0800
+  ───────────────────────── ──────── ──────── ──────────────
+  SCORE MES                   6.7671                  6.7671
+  Clase: B+++  |  Risk: Seguro
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  📅 MES: 2025-12  |  Score: 6.4967  |  Clase: B++  |  Risk: Seguro
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  📊 DATOS CRUDOS DEL MES:
+    NGR (calculo_ngr):                 6,372.04
+    Comisión (calculo_comision):        6,372.04
+    Total Depósitos ($):              168,156.02
+    Num. Depósitos (txn):                  4,846
+    Total Retiros ($):               -120,498.07
+    Num. Retiros (txn):                    1,212
+    GGR Casino:                             0.00
+    GGR Deportes:                      31,860.22
+    GGR Total:                         31,860.22
+    Jugadores Activos:                       392
+    Apuestas Est. Casino:                   0.00
+    Apuestas Est. Deportes:           637,204.40
+    Apuestas Est. Total:              637,204.40
+
+  ⚙️  CÁLCULOS DETALLADOS POR MÉTRICA:
+
+  1️⃣  RENTABILIDAD (Peso: 0.12)
+     Fórmula: (NGR / Depósitos) * 100 = (6,372.04 / 168,156.02) * 100 = 3.7894%
+     Condición: else → score_pct = max(0, min(7, 3.7894 * 1.75)) = 6.6314
+     Bonus volumen: min(3.0, log10(6,372.04+1) * 0.75) = 2.8533
+     ✅ Score = 6.6314 + 2.8533 = 9.4846
+
+  2️⃣  VOLUMEN (Peso: 0.15)
+     Fórmula: min(10, max(0, log10(6058+1) * 2.3)) = 8.6995
+     ✅ Score = 8.6995
+
+  3️⃣  FIDELIDAD (Peso: 0.15)
+     Fórmula: min(10, (392 / 9908) * 100 * 2.5) = 9.8910
+     ✅ Score = 9.8910
+
+  4️⃣  ESTABILIDAD (Peso: 0.12)
+     Snapshot mensual → Score = 5.0 (neutral)
+     ✅ Score = 5.0000
+
+  5️⃣  CRECIMIENTO (Peso: 0.10)
+     Fórmula: ((4846 - 5205) / 5205) * 100 = -6.90%
+     Condición: pct=-6.90% → Score = 3.5
+     ✅ Score = 3.5000
+
+  6️⃣  EFICIENCIA CASINO (Peso: 0.08)
+     GGR Casino <= 0 → Score = 0
+     ✅ Score = 0.0000
+
+  7️⃣  EFICIENCIA DEPORTES (Peso: 0.08)
+     Fórmula: (4846 / 31,860.22) * 100 = 15.2102
+     Condición: val=15.2102 → Score = 3
+     ✅ Score = 3.0000
+
+  8️⃣  CONVERSIÓN (Peso: 0.11)
+     Fórmula: (31,860.22 / 168,156.02) * 100 = 18.9468%
+     Condición: val=18.9468% → Score = 10
+     ✅ Score = 10.0000
+
+  9️⃣  TENDENCIA (Peso: 0.04)
+     Snapshot mensual → Score = 5.0 (neutral)
+     ✅ Score = 5.0000
+
+  🔟  DIVERSIFICACIÓN (Peso: 0.03)
+     Casino bets: 0.00, Deportes bets: 637,204.40
+     HHI = (0.00/637,204.40)² + (637,204.40/637,204.40)² = 1.000000
+     Fórmula: (1 - 1.000000) * 10 = 0.0000
+     ✅ Score = 0.0000
+
+  1️⃣1️⃣ CALIDAD JUGADORES (Peso: 0.02)
+     Fórmula: Apuestas / Jugadores = 637,204.40 / 392 = 1,625.52
+     Condición: avg=1,625.52 → Score = 4
+     ✅ Score = 4.0000
+
+  📋 RESUMEN DEL MES 2025-12:
+  Métrica                      Score     Peso   Contribución
+  ───────────────────────── ──────── ──────── ──────────────
+  rentabilidad                9.4846     0.12         1.1382
+  volumen                     8.6995     0.15         1.3049
+  fidelidad                   9.8910     0.15         1.4836
+  estabilidad                 5.0000     0.12         0.6000
+  crecimiento                 3.5000     0.10         0.3500
+  eficiencia_casino           0.0000     0.08         0.0000
+  eficiencia_deportes         3.0000     0.08         0.2400
+  eficiencia_conversion      10.0000     0.11         1.1000
+  tendencia                   5.0000     0.04         0.2000
+  diversificacion             0.0000     0.03         0.0000
+  calidad_jugadores           4.0000     0.02         0.0800
+  ───────────────────────── ──────── ──────── ──────────────
+  SCORE MES                   6.4967                  6.4967
+  Clase: B++  |  Risk: Seguro
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  📅 MES: 2026-01  |  Score: 6.9441  |  Clase: B+++  |  Risk: Seguro
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  📊 DATOS CRUDOS DEL MES:
+    NGR (calculo_ngr):                 6,526.05
+    Comisión (calculo_comision):        6,526.05
+    Total Depósitos ($):              151,831.81
+    Num. Depósitos (txn):                  4,956
+    Total Retiros ($):               -125,940.23
+    Num. Retiros (txn):                    1,049
+    GGR Casino:                        14,618.78
+    GGR Deportes:                      18,011.47
+    GGR Total:                         32,630.25
+    Jugadores Activos:                       470
+    Apuestas Est. Casino:             292,375.60
+    Apuestas Est. Deportes:           360,229.40
+    Apuestas Est. Total:              652,605.00
+
+  ⚙️  CÁLCULOS DETALLADOS POR MÉTRICA:
+
+  1️⃣  RENTABILIDAD (Peso: 0.12)
+     Fórmula: (NGR / Depósitos) * 100 = (6,526.05 / 151,831.81) * 100 = 4.2982%
+     Condición: rent_pct >= 4 → score_pct = 4.0
+     Bonus volumen: min(3.0, log10(6,526.05+1) * 0.75) = 2.8610
+     ✅ Score = 4.0000 + 2.8610 = 6.8610
+
+  2️⃣  VOLUMEN (Peso: 0.15)
+     Fórmula: min(10, max(0, log10(6005+1) * 2.3)) = 8.6907
+     ✅ Score = 8.6907
+
+  3️⃣  FIDELIDAD (Peso: 0.15)
+     Fórmula: min(10, (470 / 9908) * 100 * 2.5) = 10.0000
+     ✅ Score = 10.0000
+
+  4️⃣  ESTABILIDAD (Peso: 0.12)
+     Snapshot mensual → Score = 5.0 (neutral)
+     ✅ Score = 5.0000
+
+  5️⃣  CRECIMIENTO (Peso: 0.10)
+     Fórmula: ((4956 - 4846) / 4846) * 100 = 2.27%
+     Condición: pct=2.27% → Score = 5
+     ✅ Score = 5.0000
+
+  6️⃣  EFICIENCIA CASINO (Peso: 0.08)
+     Fórmula: (4956 / 14,618.78) * 100 = 33.9016
+     Condición: val=33.9016 → Score = 6.60984021922486
+     ✅ Score = 6.6098
+
+  7️⃣  EFICIENCIA DEPORTES (Peso: 0.08)
+     Fórmula: (4956 / 18,011.47) * 100 = 27.5158
+     Condición: val=27.5158 → Score = 2
+     ✅ Score = 2.0000
+
+  8️⃣  CONVERSIÓN (Peso: 0.11)
+     Fórmula: (32,630.25 / 151,831.81) * 100 = 21.4910%
+     Condición: val=21.4910% → Score = 10
+     ✅ Score = 10.0000
+
+  9️⃣  TENDENCIA (Peso: 0.04)
+     Snapshot mensual → Score = 5.0 (neutral)
+     ✅ Score = 5.0000
+
+  🔟  DIVERSIFICACIÓN (Peso: 0.03)
+     Casino bets: 292,375.60, Deportes bets: 360,229.40
+     HHI = (292,375.60/652,605.00)² + (360,229.40/652,605.00)² = 0.505405
+     Fórmula: (1 - 0.505405) * 10 = 4.9459
+     ✅ Score = 4.9459
+
+  1️⃣1️⃣ CALIDAD JUGADORES (Peso: 0.02)
+     Fórmula: Apuestas / Jugadores = 652,605.00 / 470 = 1,388.52
+     Condición: avg=1,388.52 → Score = 4
+     ✅ Score = 4.0000
+
+  📋 RESUMEN DEL MES 2026-01:
+  Métrica                      Score     Peso   Contribución
+  ───────────────────────── ──────── ──────── ──────────────
+  rentabilidad                6.8610     0.12         0.8233
+  volumen                     8.6907     0.15         1.3036
+  fidelidad                  10.0000     0.15         1.5000
+  estabilidad                 5.0000     0.12         0.6000
+  crecimiento                 5.0000     0.10         0.5000
+  eficiencia_casino           6.6098     0.08         0.5288
+  eficiencia_deportes         2.0000     0.08         0.1600
+  eficiencia_conversion      10.0000     0.11         1.1000
+  tendencia                   5.0000     0.04         0.2000
+  diversificacion             4.9459     0.03         0.1484
+  calidad_jugadores           4.0000     0.02         0.0800
+  ───────────────────────── ──────── ──────── ──────────────
+  SCORE MES                   6.9441                  6.9441
+  Clase: B+++  |  Risk: Seguro
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  📅 MES: 2026-02  |  Score: 5.8871  |  Clase: B++  |  Risk: Seguro
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  📊 DATOS CRUDOS DEL MES:
+    NGR (calculo_ngr):                 1,764.72
+    Comisión (calculo_comision):        1,764.72
+    Total Depósitos ($):               13,001.24
+    Num. Depósitos (txn):                    523
+    Total Retiros ($):                 -8,959.69
+    Num. Retiros (txn):                      161
+    GGR Casino:                         2,022.94
+    GGR Deportes:                       6,800.65
+    GGR Total:                          8,823.59
+    Jugadores Activos:                       230
+    Apuestas Est. Casino:              40,458.80
+    Apuestas Est. Deportes:           136,013.00
+    Apuestas Est. Total:              176,471.80
+
+  ⚙️  CÁLCULOS DETALLADOS POR MÉTRICA:
+
+  1️⃣  RENTABILIDAD (Peso: 0.12)
+     Fórmula: (NGR / Depósitos) * 100 = (1,764.72 / 13,001.24) * 100 = 13.5735%
+     Condición: rent_pct >= 8 → score_pct = 7.0
+     Bonus volumen: min(3.0, log10(1,764.72+1) * 0.75) = 2.4352
+     ✅ Score = 7.0000 + 2.4352 = 9.4352
+
+  2️⃣  VOLUMEN (Peso: 0.15)
+     Fórmula: min(10, max(0, log10(684+1) * 2.3)) = 6.5221
+     ✅ Score = 6.5221
+
+  3️⃣  FIDELIDAD (Peso: 0.15)
+     Fórmula: min(10, (230 / 9908) * 100 * 2.5) = 5.8034
+     ✅ Score = 5.8034
+
+  4️⃣  ESTABILIDAD (Peso: 0.12)
+     Snapshot mensual → Score = 5.0 (neutral)
+     ✅ Score = 5.0000
+
+  5️⃣  CRECIMIENTO (Peso: 0.10)
+     Fórmula: ((523 - 4956) / 4956) * 100 = -89.45%
+     Condición: pct=-89.45% → Score = 1
+     ✅ Score = 1.0000
+
+  6️⃣  EFICIENCIA CASINO (Peso: 0.08)
+     Fórmula: (523 / 2,022.94) * 100 = 25.8535
+     Condición: val=25.8535 → Score = 2
+     ✅ Score = 2.0000
+
+  7️⃣  EFICIENCIA DEPORTES (Peso: 0.08)
+     Fórmula: (523 / 6,800.65) * 100 = 7.6904
+     Condición: val=7.6904 → Score = 7.5
+     ✅ Score = 7.5000
+
+  8️⃣  CONVERSIÓN (Peso: 0.11)
+     Fórmula: (8,823.59 / 13,001.24) * 100 = 67.8673%
+     Condición: val=67.8673% → Score = 10
+     ✅ Score = 10.0000
+
+  9️⃣  TENDENCIA (Peso: 0.04)
+     Snapshot mensual → Score = 5.0 (neutral)
+     ✅ Score = 5.0000
+
+  🔟  DIVERSIFICACIÓN (Peso: 0.03)
+     Casino bets: 40,458.80, Deportes bets: 136,013.00
+     HHI = (40,458.80/176,471.80)² + (136,013.00/176,471.80)² = 0.646595
+     Fórmula: (1 - 0.646595) * 10 = 3.5341
+     ✅ Score = 3.5341
+
+  1️⃣1️⃣ CALIDAD JUGADORES (Peso: 0.02)
+     Fórmula: Apuestas / Jugadores = 176,471.80 / 230 = 767.27
+     Condición: avg=767.27 → Score = 2
+     ✅ Score = 2.0000
+
+  📋 RESUMEN DEL MES 2026-02:
+  Métrica                      Score     Peso   Contribución
+  ───────────────────────── ──────── ──────── ──────────────
+  rentabilidad                9.4352     0.12         1.1322
+  volumen                     6.5221     0.15         0.9783
+  fidelidad                   5.8034     0.15         0.8705
+  estabilidad                 5.0000     0.12         0.6000
+  crecimiento                 1.0000     0.10         0.1000
+  eficiencia_casino           2.0000     0.08         0.1600
+  eficiencia_deportes         7.5000     0.08         0.6000
+  eficiencia_conversion      10.0000     0.11         1.1000
+  tendencia                   5.0000     0.04         0.2000
+  diversificacion             3.5341     0.03         0.1060
+  calidad_jugadores           2.0000     0.02         0.0400
+  ───────────────────────── ──────── ──────── ──────────────
+  SCORE MES                   5.8871                  5.8871
+  Clase: B++  |  Risk: Seguro
+
+

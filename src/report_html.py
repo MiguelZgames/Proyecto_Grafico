@@ -397,6 +397,7 @@ def generate_html_report(df_agents, df_monthly=None, out_path="reports/dashboard
         .metric-box:hover { transform: translateY(-2px); border-color: var(--accent); }
         .metric-val { font-size: 15px; font-weight: 700; color: var(--primary); margin-bottom: 2px; }
         .metric-lbl { font-size: 9px; color: #7f8c8d; text-transform: uppercase; letter-spacing: 0.5px; }
+        .metric-formula { font-size: 9px; color: #94a3b8; margin-top: 2px; font-style: italic; }
         
         /* Charts Area */
         .radar-section {
@@ -614,7 +615,12 @@ def generate_html_report(df_agents, df_monthly=None, out_path="reports/dashboard
         <div class="sidebar-header">
             <input type="text" id="searchInput" class="search-box" placeholder="Buscar por ID o Nombre..." onkeyup="filterList()">
             
-
+            <div class="date-filter-container">
+                <span class="date-filter-label">📅 Filtro Mensual</span>
+                <select id="monthFilter" class="month-filter" style="width:100%;" onchange="updateTopAgencies()">
+                    <option value="all">Todos los Meses</option>
+                </select>
+            </div>
             
             <div class="filter-btns">
                 <button class="filter-btn active" id="btn-all" onclick="filterClass('all')">Todos</button>
@@ -865,7 +871,7 @@ def generate_html_report(df_agents, df_monthly=None, out_path="reports/dashboard
         }
     });
     
-    // 1. Determine Date Range
+    // 1. Determine Date Range & Populate Month Filter
     const allMonths = new Set();
     if(monthlyData) {
         Object.values(monthlyData).forEach(list => {
@@ -874,7 +880,35 @@ def generate_html_report(df_agents, df_monthly=None, out_path="reports/dashboard
     }
     const sortedMonths = Array.from(allMonths).sort(); // Ascending for range
     
-    // Init Date Inputs - Removed
+    // Month name mapping (Spanish)
+    const monthNames = {
+        '01': 'Enero', '02': 'Febrero', '03': 'Marzo', '04': 'Abril',
+        '05': 'Mayo', '06': 'Junio', '07': 'Julio', '08': 'Agosto',
+        '09': 'Septiembre', '10': 'Octubre', '11': 'Noviembre', '12': 'Diciembre'
+    };
+    
+    // Populate month filter dropdown
+    const monthFilterEl = document.getElementById('monthFilter');
+    if (monthFilterEl && sortedMonths.length > 0) {
+        sortedMonths.forEach(m => {
+            const opt = document.createElement('option');
+            opt.value = m;
+            // Parse month string (e.g. "2025-01") to display name
+            const parts = m.split('-');
+            const monthNum = parts.length >= 2 ? parts[1] : '';
+            const year = parts.length >= 1 ? parts[0] : '';
+            const name = monthNames[monthNum] || m;
+            opt.textContent = name + ' ' + year;
+            monthFilterEl.appendChild(opt);
+        });
+        // Default to January (first month containing '01', or first available)
+        const januaryMonth = sortedMonths.find(m => m.endsWith('-01'));
+        if (januaryMonth) {
+            monthFilterEl.value = januaryMonth;
+        } else {
+            monthFilterEl.value = sortedMonths[0];
+        }
+    }
 
 
     function calculateSimilarityJS(agent) {
@@ -1167,20 +1201,29 @@ def generate_html_report(df_agents, df_monthly=None, out_path="reports/dashboard
 
     function updateTopAgencies() {
         try {
+            const selectedMonth = document.getElementById('monthFilter') ? document.getElementById('monthFilter').value : 'all';
+            const isMonthly = selectedMonth !== 'all';
+            
+            // Metric keys for per-month data
+            const metricKeys = [
+                'rentabilidad', 'volumen', 'fidelidad', 'estabilidad', 
+                'crecimiento', 'eficiencia_casino', 'eficiencia_deportes', 
+                'eficiencia_conversion', 'tendencia', 'diversificacion', 'calidad_jugadores'
+            ];
+            
             // Recalculate Metrics for range
         displayedAgents = allAgents.map(agent => {
             const mData = monthlyData ? monthlyData[agent.id_agente.toString()] : null;
             if (!mData) return { ...agent, _noData: true, total_depositos: 0, score_global: 0 };
             
-            // Filter months
-            const rangeData = mData; // Use all data
+            // Filter months based on selection
+            const rangeData = isMonthly ? mData.filter(d => d.month === selectedMonth) : mData;
             
             if (rangeData.length === 0) {
                  return { ...agent, _noData: true, total_depositos: 0, score_global: 0, rank_global: 9999 };
             }
             
-            // Aggregate
-            // Sums (Keep dynamic sums for financial totals)
+            // Aggregate financial sums
             const sums = {
                 total_depositos: 0, total_retiros: 0, 
                 calculo_ggr: 0, calculo_ngr: 0, calculo_comision: 0
@@ -1194,9 +1237,20 @@ def generate_html_report(df_agents, df_monthly=None, out_path="reports/dashboard
                 sums.calculo_comision += (d.calculo_comision || 0);
             });
             
-            // --- FIX: Use static metrics from Python backend instead of re-calculating from missing monthly columns ---
-            // The following metrics are calculated on the full history in backend and are not present in monthlyData
             const result = { ...agent, ...sums, _noData: false };
+            
+            // --- Monthly mode: use per-month metrics, score, Clase, Risk_Safe from backend ---
+            if (isMonthly && rangeData.length === 1) {
+                const monthRow = rangeData[0];
+                // Override score and metrics with the specific month's values
+                result.score_global = monthRow.score_global || 0;
+                result.Clase = monthRow.Clase || agent.Clase;
+                result.Risk_Safe = monthRow.Risk_Safe !== undefined ? monthRow.Risk_Safe : agent.Risk_Safe;
+                metricKeys.forEach(mk => {
+                    if (monthRow[mk] !== undefined) result[mk] = monthRow[mk];
+                });
+            }
+            // --- Aggregated mode: keep original backend metrics ---
             
             // Recalculate Dynamic Similarity
             result.sim_data = calculateSimilarityJS(result);
@@ -1327,17 +1381,39 @@ def generate_html_report(df_agents, df_monthly=None, out_path="reports/dashboard
         
         // Metrics
         const fmt1 = (val) => val !== undefined ? val.toFixed(1) : '-';
-        if(document.getElementById('valRen')) document.getElementById('valRen').textContent = fmt1(a.rentabilidad);
-        if(document.getElementById('valVol')) document.getElementById('valVol').textContent = fmt1(a.volumen);
-        if(document.getElementById('valFid')) document.getElementById('valFid').textContent = fmt1(a.fidelidad);
-        if(document.getElementById('valEst')) document.getElementById('valEst').textContent = fmt1(a.estabilidad);
-        if(document.getElementById('valCre')) document.getElementById('valCre').textContent = fmt1(a.crecimiento);
-        if(document.getElementById('valCas')) document.getElementById('valCas').textContent = fmt1(a.eficiencia_casino);
-        if(document.getElementById('valDepScore')) document.getElementById('valDepScore').textContent = fmt1(a.eficiencia_deportes); // Changed ID to avoid conflict with financial 'valDep'
-        if(document.getElementById('valConv')) document.getElementById('valConv').textContent = fmt1(a.eficiencia_conversion);
-        if(document.getElementById('valTen')) document.getElementById('valTen').textContent = fmt1(a.tendencia);
-        if(document.getElementById('valDiv')) document.getElementById('valDiv').textContent = fmt1(a.diversificacion);
-        if(document.getElementById('valCal')) document.getElementById('valCal').textContent = fmt1(a.calidad_jugadores);
+        if(document.getElementById('valRen')) {
+            document.getElementById('valRen').innerHTML = fmt1(a.rentabilidad) + '<div class="metric-formula">(NGR / Depósitos) * 100</div>';
+        }
+        if(document.getElementById('valVol')) {
+            document.getElementById('valVol').innerHTML = fmt1(a.volumen) + '<div class="metric-formula">Log(Depósitos + Retiros)</div>';
+        }
+        if(document.getElementById('valFid')) {
+            document.getElementById('valFid').innerHTML = fmt1(a.fidelidad) + '<div class="metric-formula">Jugadores / Total Global</div>';
+        }
+        if(document.getElementById('valEst')) {
+            document.getElementById('valEst').innerHTML = fmt1(a.estabilidad) + '<div class="metric-formula">1 - Coef. Variación (NGR)</div>';
+        }
+        if(document.getElementById('valCre')) {
+            document.getElementById('valCre').innerHTML = fmt1(a.crecimiento) + '<div class="metric-formula">Crecimiento Depósitos Mensual</div>';
+        }
+        if(document.getElementById('valCas')) {
+            document.getElementById('valCas').innerHTML = fmt1(a.eficiencia_casino) + '<div class="metric-formula">Depósitos / GGR Casino</div>';
+        }
+        if(document.getElementById('valDepScore')) {
+            document.getElementById('valDepScore').innerHTML = fmt1(a.eficiencia_deportes) + '<div class="metric-formula">Depósitos / GGR Deportes</div>';
+        }
+        if(document.getElementById('valConv')) {
+            document.getElementById('valConv').innerHTML = fmt1(a.eficiencia_conversion) + '<div class="metric-formula">GGR Total / Depósitos</div>';
+        }
+        if(document.getElementById('valTen')) {
+            document.getElementById('valTen').innerHTML = fmt1(a.tendencia) + '<div class="metric-formula">Pendiente Comisiones</div>';
+        }
+        if(document.getElementById('valDiv')) {
+            document.getElementById('valDiv').innerHTML = fmt1(a.diversificacion) + '<div class="metric-formula">1 - HHI (Tipos Apuesta)</div>';
+        }
+        if(document.getElementById('valCal')) {
+            document.getElementById('valCal').innerHTML = fmt1(a.calidad_jugadores) + '<div class="metric-formula">Apuestas / Jugadores</div>';
+        }
         
         // Financials
         const fmt = new Intl.NumberFormat('en-US', { notation: "compact" });
