@@ -1,15 +1,14 @@
-
 """
 MÓDULO CENTRAL DE LÓGICA Y ANÁLISIS DE AGENTES
 ==============================================
 
-Este módulo consolida toda la lógica de cálculo de métricas, scoring, 
-categorización, predicción y análisis profundo (retención, crecimiento orgánico)
-del proyecto.
+Este módulo consolida la lógica de análisis (scoring, categorización, crédito, etc.)
+y, de forma CRÍTICA, mantiene como fuente única de verdad la lógica original de
+cálculo de las 11 métricas (0-10) del archivo `dashboard_agentes_limpio1.py`.
 
-Reemplaza a:
-- src/metricas_agente.py
-- src/dashboard_agentes_limpio1.py (lógica de backend)
+Regla:
+- NO reimplementar fórmulas/umbrales/guardas de métricas en este módulo.
+- El cálculo mensual se deriva SOLO filtrando datos y llamando a la función original.
 """
 
 import numpy as np
@@ -17,378 +16,456 @@ import pandas as pd
 from datetime import datetime, timedelta
 
 # ============================================================================
-# CONFIGURACIÓN Y PESOS
+# FUENTE ORIGINAL: MÉTRICAS + HELPERS (COPIA EXACTA DEL DASHBOARD)
+# ----------------------------------------------------------------------------
+# Nota: esta sección se copia exactamente desde `dashboard_agentes_limpio1.py`
+# para evitar dependencias de import en despliegues donde el dashboard no esté.
 # ============================================================================
 
+# PESOS DE LAS MÉTRICAS (según .tex)
 PESOS_METRICAS = {
-    'rentabilidad': 0.12,           # Rentabilidad de Comisión
-    'volumen': 0.15,                # Volumen de Negocio
-    'fidelidad': 0.15,              # Fidelidad de Jugadores
-    'estabilidad': 0.12,            # Estabilidad Financiera
-    'crecimiento': 0.10,            # Crecimiento de Depósitos
-    'eficiencia_casino': 0.08,      # Eficiencia Casino
-    'eficiencia_deportes': 0.08,    # Eficiencia Deportes
-    'eficiencia_conversion': 0.11,  # Eficiencia de Conversión
-    'tendencia': 0.04,              # Tendencia Técnica
-    'diversificacion': 0.03,        # Diversificación de Productos
-    'calidad_jugadores': 0.02       # Calidad de Jugadores
+    'rentabilidad': 0.12,
+    'volumen': 0.15,
+    'fidelidad': 0.15,
+    'estabilidad': 0.12,
+    'crecimiento': 0.10,
+    'eficiencia_casino': 0.08,
+    'eficiencia_deportes': 0.08,
+    'eficiencia_conversion': 0.11,
+    'tendencia': 0.04,
+    'diversificacion': 0.03,
+    'calidad_jugadores': 0.02
 }
 
-# ============================================================================
-# FUNCIONES AUXILIARES DE CÁLCULO
-# ============================================================================
-
 def calcular_percentil_25(historial):
-    if len(historial) == 0: return 0
+    """Calcula el percentil 25 del historial"""
+    if len(historial) == 0:
+        return 0
     return np.percentile(historial, 25)
 
 def calcular_coeficiente_variacion(historial):
-    if len(historial) < 2: return 0
+    """Calcula el coeficiente de variación (CV)"""
+    if len(historial) < 2:
+        return 0
     media = np.mean(historial)
-    if media == 0: return 0
+    if media == 0:
+        return 0
     desv_std = np.std(historial, ddof=1)
     return desv_std / abs(media)
 
 def calcular_factor_volatilidad(cv_log):
-    if cv_log < 0.2: return 1.00, "Baja volatilidad"
-    elif cv_log < 0.4: return 0.85, "Moderada"
-    elif cv_log < 0.6: return 0.70, "Alta"
-    elif cv_log < 0.8: return 0.55, "Muy alta"
-    else: return 0.40, "Extrema"
+    """Calcula el factor de volatilidad basado en el CV logarítmico"""
+    if cv_log < 0.2:
+        return 1.00, "Baja volatilidad"
+    elif cv_log < 0.4:
+        return 0.85, "Moderada"
+    elif cv_log < 0.6:
+        return 0.70, "Alta"
+    elif cv_log < 0.8:
+        return 0.55, "Muy alta"
+    else:
+        return 0.40, "Extrema"
 
 def calcular_tendencia_lineal(historial):
-    if len(historial) < 2: return 0
+    """Calcula la tendencia usando regresión lineal"""
+    if len(historial) < 2:
+        return 0
+    
     n = len(historial)
     t = np.arange(1, n + 1)
+    
     numerador = n * np.sum(t * historial) - np.sum(t) * np.sum(historial)
     denominador = n * np.sum(t**2) - (np.sum(t))**2
-    if denominador == 0: return 0
+    
+    if denominador == 0:
+        return 0
+    
     return numerador / denominador
 
 def calcular_factor_tendencia(tendencia):
-    if tendencia > 5000: return 1.15, "Crecimiento fuerte"
-    elif tendencia > 0: return 1.05, "Crecimiento moderado"
-    elif tendencia >= -5000: return 0.95, "Estancamiento"
-    else: return 0.80, "Decrecimiento"
-
-# ============================================================================
-# LÓGICA CORE: 11 MÉTRICAS (De metricas_agente.py)
-# ============================================================================
+    """Calcula el factor de tendencia"""
+    if tendencia > 5000:
+        return 1.15, "Crecimiento fuerte"
+    elif tendencia > 0:
+        return 1.05, "Crecimiento moderado"
+    elif tendencia >= -5000:
+        return 0.95, "Estancamiento"
+    else:
+        return 0.80, "Decrecimiento"
 
 def calcular_metricas_agente(df_agente, total_jugadores_global=1):
-    """Calcula las 11 métricas principales para un agente (0-10)."""
-    metricas = {k: 0 for k in PESOS_METRICAS.keys()}
+    """Calcula las 11 métricas para un agente usando las columnas del dashboard"""
+    metricas = {}
     
+    # Convertir fecha y agrupar por mes
     if 'creado' not in df_agente.columns:
-        return metricas, pd.DataFrame()
-
+        return {k: 0 for k in PESOS_METRICAS.keys()}, pd.DataFrame()
+    
     df_agente = df_agente.copy()
     df_agente['creado'] = pd.to_datetime(df_agente['creado'], errors='coerce')
     df_agente = df_agente.dropna(subset=['creado'])
-
+    
     if len(df_agente) == 0:
-        return metricas, pd.DataFrame()
-
+        return {k: 0 for k in PESOS_METRICAS.keys()}, pd.DataFrame()
+    
     df_agente['mes'] = df_agente['creado'].dt.to_period('M')
-
+    
     # Agrupar por mes
     df_mensual = df_agente.groupby('mes').agg({
-        'calculo_ngr': 'sum',
-        'calculo_comision': 'sum', # Add commission aggregation
-        'num_depositos': 'sum',
-        'num_retiros': 'sum',
+        'calculo_ngr': 'sum',  # NGR = comisión
+        'num_depositos': 'sum',  # Número de depósitos
+        'num_retiros': 'sum',  # Número de retiros
         'total_depositos': 'sum',
         'total_retiros': 'sum',
         'apuestas_deportivas_ggr': 'sum',
         'casino_ggr': 'sum',
         'jugador_id': 'nunique'
-    }).reset_index().rename(columns={'jugador_id': 'active_players'})
-
-    # Totales
+    }).reset_index()
+    
     total_ngr = df_mensual['calculo_ngr'].sum()
     total_depositos = df_mensual['total_depositos'].sum()
-    total_num_depositos = df_mensual['num_depositos'].sum()
+    total_num_depositos = df_mensual['num_depositos'].sum()  # Suma de n_deposito
     total_ggr_deportes = df_mensual['apuestas_deportivas_ggr'].sum()
     total_ggr_casino = df_mensual['casino_ggr'].sum()
     total_ggr = total_ggr_deportes + total_ggr_casino
-
-    # Apuestas estimadas
-    margen_estimado = 0.05
-    total_apuestas = (total_ggr_deportes + total_ggr_casino) / margen_estimado if margen_estimado else 0
-    total_apuestas_deportes = total_ggr_deportes / margen_estimado
-    total_apuestas_casino = total_ggr_casino / margen_estimado
-
-    # 1. Rentabilidad
+    
+    # Calcular apuestas aproximadas (GGR / margen estimado)
+    margen_estimado = 0.05  # 5% margen promedio
+    total_apuestas_deportes = total_ggr_deportes / margen_estimado if total_ggr_deportes > 0 else 0
+    total_apuestas_casino = total_ggr_casino / margen_estimado if total_ggr_casino > 0 else 0
+    total_apuestas = total_apuestas_deportes + total_apuestas_casino
+    
+    # 1. Rentabilidad de Comisión (20%) - Combina % de rentabilidad con volumen absoluto
     if total_depositos > 0:
         rentabilidad_pct = (total_ngr / total_depositos) * 100
-        score_pct = 7.0 if rentabilidad_pct >= 8 else (5.5 if rentabilidad_pct >= 6 else (4.0 if rentabilidad_pct >= 4 else max(0, min(7, rentabilidad_pct * 1.75))))
-        score_volumen = min(3.0, np.log10(total_ngr + 1) * 0.75) if total_ngr > 0 else 0
+        
+        # Score base por porcentaje (0-7 puntos)
+        if rentabilidad_pct >= 8.0:
+            score_pct = 7.0
+        elif rentabilidad_pct >= 6.0:
+            score_pct = 5.5
+        elif rentabilidad_pct >= 4.0:
+            score_pct = 4.0
+        else:
+            score_pct = max(0, min(7, rentabilidad_pct * 1.75))
+        
+        # Bonus por volumen absoluto de comisión (0-3 puntos)
+        # $1K=0.5, $5K=1.5, $10K=2.0, $20K=2.5, $50K=3.0
+        if total_ngr > 0:
+            score_volumen = min(3.0, np.log10(total_ngr + 1) * 0.75)
+        else:
+            score_volumen = 0
+        
         metricas['rentabilidad'] = score_pct + score_volumen
-
-    # 2. Volumen
-    total_transacciones = total_num_depositos + df_mensual['num_retiros'].sum()
-    metricas['volumen'] = min(10, max(0, np.log10(total_transacciones + 1) * 2.3)) if total_transacciones > 0 else 0
-
-    # 3. Fidelidad
+    else:
+        metricas['rentabilidad'] = 0
+    
+    # 2. Volumen de Negocio (15%) - Basado en número de transacciones (n_deposito + n_retiro)
+    total_transacciones = df_mensual['num_depositos'].sum() + df_mensual['num_retiros'].sum()
+    if total_transacciones > 0:
+        # Escala logarítmica: 10 trans=2.3, 50=3.9, 100=4.6, 500=6.2, 1000=6.9, 5000=8.5
+        volumen = np.log10(total_transacciones + 1) * 2.3
+        metricas['volumen'] = min(10, max(0, volumen))
+    else:
+        metricas['volumen'] = 0
+    
+    # 3. Fidelidad de Jugadores (15%) - Proporción de jugadores del agente respecto al total
     jugadores_agente = df_agente['jugador_id'].nunique()
     if total_jugadores_global > 0:
-        metricas['fidelidad'] = min(10, (jugadores_agente / total_jugadores_global) * 100 * 2.5)
-
-    # 4. Estabilidad
-    comisiones = df_mensual['calculo_ngr'].values
-    if len(comisiones) > 1:
-        min_c = np.min(comisiones)
-        c_log = np.log(comisiones + abs(min_c) + 1)
-        ef = 1 - calcular_coeficiente_variacion(c_log)
-        if ef >= 0.8: metricas['estabilidad'] = 8 + ((ef-0.8)/0.2)*2
-        elif ef >= 0.6: metricas['estabilidad'] = 6 + ((ef-0.6)/0.2)*2
-        elif ef >= 0.4: metricas['estabilidad'] = 4 + ((ef-0.4)/0.2)*2
-        elif ef >= 0: metricas['estabilidad'] = (ef/0.4)*4
+        proporcion_jugadores = (jugadores_agente / total_jugadores_global) * 100
+        # Escala: 1%=2.5, 2%=5.0, 5%=7.5, 10%=10.0
+        metricas['fidelidad'] = min(10, proporcion_jugadores * 2.5)
+    else:
+        metricas['fidelidad'] = 0
+    
+    # 4. Estabilidad Financiera (10%) - EF_log = 1 - (σ_log / μ_log)
+    # Usar comisiones mensuales (calculo_ngr = comis_calculada) con transformación logarítmica
+    comisiones_mensuales = df_mensual['calculo_ngr'].values
+    if len(comisiones_mensuales) > 1:
+        # Transformación logarítmica: x'_i = ln(x_i + |min(x)| + 1)
+        min_comision = np.min(comisiones_mensuales)
+        comisiones_log = np.log(comisiones_mensuales + abs(min_comision) + 1)
+        
+        # Calcular CV con datos transformados
+        cv_log = calcular_coeficiente_variacion(comisiones_log)
+        # EF_log = 1 - CV_log
+        ef = 1 - cv_log
+        
+        # Convertir EF a escala 0-10 según rangos
+        # EF ≥ 0.8: Alta estabilidad → 8-10 puntos
+        # 0.6 ≤ EF < 0.8: Estabilidad moderada → 6-8 puntos
+        # 0.4 ≤ EF < 0.6: Estabilidad baja → 4-6 puntos
+        # EF < 0.4: Inestabilidad alta → 0-4 puntos
+        
+        if ef >= 0.8:
+            # Mapear [0.8, 1.0] → [8, 10]
+            metricas['estabilidad'] = 8.0 + ((ef - 0.8) / 0.2) * 2.0
+        elif ef >= 0.6:
+            # Mapear [0.6, 0.8) → [6, 8]
+            metricas['estabilidad'] = 6.0 + ((ef - 0.6) / 0.2) * 2.0
+        elif ef >= 0.4:
+            # Mapear [0.4, 0.6) → [4, 6]
+            metricas['estabilidad'] = 4.0 + ((ef - 0.4) / 0.2) * 2.0
+        elif ef >= 0:
+            # Mapear [0, 0.4) → [0, 4]
+            metricas['estabilidad'] = (ef / 0.4) * 4.0
+        else:
+            # CV > 1, muy inestable
+            metricas['estabilidad'] = 0
     else:
         metricas['estabilidad'] = 5.0
-
-    # 5. Crecimiento (Últimos 2 meses)
+    
+    # 5. Crecimiento de Depósitos (10%) - Basado en número de depósitos (n_deposito)
+    # Fórmula: (suma_n_deposito_mes_actual - suma_n_deposito_mes_anterior) / suma_n_deposito_mes_anterior
+    # Comparar último mes con mes anterior
     if len(df_mensual) >= 2:
-        dep_act = df_mensual.iloc[-1]['num_depositos']
-        dep_ant = df_mensual.iloc[-2]['num_depositos']
-        if dep_ant > 0:
-            pct = ((dep_act - dep_ant)/dep_ant)*100
-            if pct >= 20: metricas['crecimiento'] = 10
-            elif pct >= 10: metricas['crecimiento'] = 8
-            elif pct >= 5: metricas['crecimiento'] = 6.5
-            elif pct >= 0: metricas['crecimiento'] = 5
-            elif pct >= -10: metricas['crecimiento'] = 3.5
-            elif pct >= -20: metricas['crecimiento'] = 2
-            else: metricas['crecimiento'] = 1
-        elif dep_act > 0: metricas['crecimiento'] = 10
+        depositos_actual = df_mensual.iloc[-1]['num_depositos']
+        depositos_anterior = df_mensual.iloc[-2]['num_depositos']
+        
+        if depositos_anterior > 0:
+            crecimiento_pct = ((depositos_actual - depositos_anterior) / depositos_anterior) * 100
+            
+            # Escala ajustada para crecimiento de número de depósitos
+            if crecimiento_pct >= 20:
+                metricas['crecimiento'] = 10.0
+            elif crecimiento_pct >= 10:
+                metricas['crecimiento'] = 8.0
+            elif crecimiento_pct >= 5:
+                metricas['crecimiento'] = 6.5
+            elif crecimiento_pct >= 0:
+                metricas['crecimiento'] = 5.0
+            elif crecimiento_pct >= -10:
+                metricas['crecimiento'] = 3.5
+            elif crecimiento_pct >= -20:
+                metricas['crecimiento'] = 2.0
+            else:
+                metricas['crecimiento'] = 1.0
+        elif depositos_actual > 0:
+            # Mes anterior sin depósitos pero actual sí tiene = crecimiento máximo
+            metricas['crecimiento'] = 10.0
+        else:
+            # Ambos meses sin depósitos
+            metricas['crecimiento'] = 0
     else:
         metricas['crecimiento'] = 5.0
-
-    # 6. Eficiencia Casino
+    
+    # 6. Eficiencia Casino (8%) - EC_casino = (n_deposito / GGR_casino) * 100
+    # Menor valor = mejor eficiencia (menos depósitos necesarios por unidad de GGR)
     if total_ggr_casino > 0:
-        val = (total_num_depositos / total_ggr_casino) * 100
-        if val < 5.5: metricas['eficiencia_casino'] = 10
-        elif val < 10: metricas['eficiencia_casino'] = 7.5
-        elif val < 14: metricas['eficiencia_casino'] = 5
-        elif val < 20: metricas['eficiencia_casino'] = 3
-        elif val < 33: metricas['eficiencia_casino'] = 2
-        else: metricas['eficiencia_casino'] = max(1.0, 10 - (val/10)) # Min 1.0 if active
-
-    # 7. Eficiencia Deportes
-    if total_ggr_deportes > 0:
-        val = (total_num_depositos / total_ggr_deportes) * 100
-        if val < 5.5: metricas['eficiencia_deportes'] = 10
-        elif val < 10: metricas['eficiencia_deportes'] = 7.5
-        elif val < 14: metricas['eficiencia_deportes'] = 5
-        elif val < 20: metricas['eficiencia_deportes'] = 3
-        elif val < 33: metricas['eficiencia_deportes'] = 2
-        else: metricas['eficiencia_deportes'] = max(1.0, 10 - (val/10)) # Min 1.0 if active
-
-    # 8. Conversión
-    if total_depositos > 0:
-        val = (total_ggr / total_depositos) * 100
-        if val >= 15: metricas['eficiencia_conversion'] = 10
-        elif val >= 10: metricas['eficiencia_conversion'] = 7.5
-        elif val >= 7: metricas['eficiencia_conversion'] = 5
-        elif val >= 5: metricas['eficiencia_conversion'] = 3
-        else: metricas['eficiencia_conversion'] = max(0, val*2)
-
-    # 9. Tendencia
-    if len(comisiones) >= 3:
-        t = calcular_tendencia_lineal(comisiones)
-        if t > 1000: metricas['tendencia'] = 8
-        elif t > 0: metricas['tendencia'] = 6
-        elif t > -1000: metricas['tendencia'] = 4
-        else: metricas['tendencia'] = 2
+        efic_casino = (total_num_depositos / total_ggr_casino) * 100
+        # Escala invertida: menor es mejor
+        # < 5.5 = 10.0 (excelente), 5.5-10 = 7.5, 10-14 = 5.0, 14-20 = 3.0, > 20 = 2.0
+        if efic_casino > 5.5:
+            metricas['eficiencia_casino'] = 10.0
+        elif efic_casino > 10:
+            metricas['eficiencia_casino'] = 7.5
+        elif efic_casino > 14:
+            metricas['eficiencia_casino'] = 5.0
+        elif efic_casino > 20:
+            metricas['eficiencia_casino'] = 3.0
+        elif efic_casino > 33:
+            metricas['eficiencia_casino'] = 2.0
+        else:
+            metricas['eficiencia_casino'] = max(0, 10 - (efic_casino / 10))
     else:
-        metricas['tendencia'] = 5
-
-    # 10. Diversificación
+        metricas['eficiencia_casino'] = 0
+    
+    # 7. Eficiencia Deportes (8%) - EC_deportes = (n_deposito / GGR_deportes) * 100
+    # Menor valor = mejor eficiencia (menos depósitos necesarios por unidad de GGR)
+    if total_ggr_deportes > 0:
+        efic_deportes = (total_num_depositos / total_ggr_deportes) * 100
+        # Escala invertida: menor es mejor
+        # < 5.5 = 10.0 (excelente), 5.5-10 = 7.5, 10-14 = 5.0, 14-20 = 3.0, > 20 = 2.0
+        if efic_deportes > 5.5:
+            metricas['eficiencia_deportes'] = 10.0
+        elif efic_deportes > 10:
+            metricas['eficiencia_deportes'] = 7.5
+        elif efic_deportes > 14:
+            metricas['eficiencia_deportes'] = 5.0
+        elif efic_deportes > 20:
+            metricas['eficiencia_deportes'] = 3.0
+        elif efic_deportes > 33:
+            metricas['eficiencia_deportes'] = 2.0
+        else:
+            metricas['eficiencia_deportes'] = max(0, 10 - (efic_deportes / 10))
+    else:
+        metricas['eficiencia_deportes'] = 0
+    
+    # 8. Eficiencia de Conversión (5%) - EC = (GGR / Depósitos) * 100
+    if total_depositos > 0:
+        conversion_pct = (total_ggr / total_depositos) * 100
+        if conversion_pct >= 15:
+            metricas['eficiencia_conversion'] = 10.0
+        elif conversion_pct >= 10:
+            metricas['eficiencia_conversion'] = 7.5
+        elif conversion_pct >= 7:
+            metricas['eficiencia_conversion'] = 5.0
+        elif conversion_pct >= 5:
+            metricas['eficiencia_conversion'] = 3.0
+        else:
+            metricas['eficiencia_conversion'] = max(0, conversion_pct * 2)
+    else:
+        metricas['eficiencia_conversion'] = 0
+    
+    # 9. Tendencia Técnica (4%)
+    if len(comisiones_mensuales) >= 3:
+        tendencia = calcular_tendencia_lineal(comisiones_mensuales)
+        if tendencia > 1000:
+            metricas['tendencia'] = 8.0
+        elif tendencia > 0:
+            metricas['tendencia'] = 6.0
+        elif tendencia > -1000:
+            metricas['tendencia'] = 4.0
+        else:
+            metricas['tendencia'] = 2.0
+    else:
+        metricas['tendencia'] = 5.0
+    
+    # 10. Diversificación de Productos (3%)
     if total_apuestas > 0:
-        hhi = (total_apuestas_casino/total_apuestas)**2 + (total_apuestas_deportes/total_apuestas)**2
-        metricas['diversificacion'] = (1 - hhi) * 10
-
-    # 11. Calidad Jugadores
+        p_casino = total_apuestas_casino / total_apuestas
+        p_deportes = total_apuestas_deportes / total_apuestas
+        hhi = p_casino**2 + p_deportes**2
+        diversificacion = (1 - hhi) * 10
+        metricas['diversificacion'] = diversificacion
+    else:
+        metricas['diversificacion'] = 0
+    
+    # 11. Calidad de Jugadores (2%)
     if jugadores_agente > 0:
-        avg = total_apuestas / jugadores_agente
-        if avg > 10000: metricas['calidad_jugadores'] = 8
-        elif avg > 5000: metricas['calidad_jugadores'] = 6
-        elif avg > 1000: metricas['calidad_jugadores'] = 4
-        else: metricas['calidad_jugadores'] = 2
-
-    # --- CÁLCULO DE SCORE MENSUAL (HISTÓRICO) ---
-    scores_mensuales = []
-    all_monthly_metrics = []  # Store per-month metric dicts
-    
-    # Pre-calculate rolling/history context if needed, but for simplicity we treat each month as a snapshot
-    # for most metrics, and use simple windows for growth.
-    
-    for i, row in df_mensual.iterrows():
-        m_score = {}
-        
-        # Data Points
-        ngr = row['calculo_ngr']
-        deps = row['total_depositos']
-        num_deps = row['num_depositos']
-        num_rets = row['num_retiros']
-        ggr_c = row['casino_ggr']
-        ggr_d = row['apuestas_deportivas_ggr']
-        ggr_total = ggr_c + ggr_d
-        players = row['active_players']
-        
-        # 1. Rentabilidad
-        if deps > 0:
-            rent_pct = (ngr / deps) * 100
-            s_pct = 7.0 if rent_pct >= 8 else (5.5 if rent_pct >= 6 else (4.0 if rent_pct >= 4 else max(0, min(7, rent_pct * 1.75))))
-            s_vol = min(3.0, np.log10(ngr + 1) * 0.75) if ngr > 0 else 0
-            m_score['rentabilidad'] = s_pct + s_vol
+        apuesta_promedio = total_apuestas / jugadores_agente
+        if apuesta_promedio > 10000:
+            metricas['calidad_jugadores'] = 8.0
+        elif apuesta_promedio > 5000:
+            metricas['calidad_jugadores'] = 6.0
+        elif apuesta_promedio > 1000:
+            metricas['calidad_jugadores'] = 4.0
         else:
-            m_score['rentabilidad'] = 0
-            
-        # 2. Volumen
-        txs = num_deps + num_rets
-        m_score['volumen'] = min(10, max(0, np.log10(txs + 1) * 2.3)) if txs > 0 else 0
-        
-        # 3. Fidelidad (Vs Global Total passed to function)
-        if total_jugadores_global > 0:
-            m_score['fidelidad'] = min(10, (players / total_jugadores_global) * 100 * 2.5)
-        else:
-            m_score['fidelidad'] = 0
-            
-        # 4. Estabilidad (Snapshot = Neutral 5.0)
-        m_score['estabilidad'] = 5.0
-        
-        # 5. Crecimiento (Vs Prev Month)
-        if i > 0:
-            prev_deps = df_mensual.iloc[i-1]['num_depositos']
-            if prev_deps > 0:
-                pct = ((num_deps - prev_deps) / prev_deps) * 100
-                if pct >= 20: m_score['crecimiento'] = 10
-                elif pct >= 10: m_score['crecimiento'] = 8
-                elif pct >= 5: m_score['crecimiento'] = 6.5
-                elif pct >= 0: m_score['crecimiento'] = 5
-                elif pct >= -10: m_score['crecimiento'] = 3.5
-                elif pct >= -20: m_score['crecimiento'] = 2
-                else: m_score['crecimiento'] = 1
-            elif num_deps > 0:
-                m_score['crecimiento'] = 10
-            else:
-                m_score['crecimiento'] = 5
-        else:
-            m_score['crecimiento'] = 5.0
-            
-        # 6. Eficiencia Casino
-        if ggr_c > 0:
-            val = (num_deps / ggr_c) * 100
-            if val > 5.5: m_score['eficiencia_casino'] = 10
-            elif val > 10: m_score['eficiencia_casino'] = 7.5
-            elif val > 14: m_score['eficiencia_casino'] = 5
-            elif val > 20: m_score['eficiencia_casino'] = 3
-            elif val > 33: m_score['eficiencia_casino'] = 2
-            else: m_score['eficiencia_casino'] = max(1.0, 10 - (val/10))
-        else:
-             m_score['eficiencia_casino'] = 0
-             
-        # 7. Eficiencia Deportes
-        if ggr_d > 0:
-            val = (num_deps / ggr_d) * 100
-            if val > 5.5: m_score['eficiencia_deportes'] = 10
-            elif val > 10: m_score['eficiencia_deportes'] = 7.5
-            elif val > 14: m_score['eficiencia_deportes'] = 5
-            elif val > 20: m_score['eficiencia_deportes'] = 3
-            elif val > 33: m_score['eficiencia_deportes'] = 2
-            else: m_score['eficiencia_deportes'] = max(1.0, 10 - (val/10))
-        else:
-            m_score['eficiencia_deportes'] = 0
-            
-        # 8. Conversión
-        if deps > 0:
-            val = (ggr_total / deps) * 100
-            if val >= 15: m_score['eficiencia_conversion'] = 10
-            elif val >= 10: m_score['eficiencia_conversion'] = 7.5
-            elif val >= 7: m_score['eficiencia_conversion'] = 5
-            elif val >= 5: m_score['eficiencia_conversion'] = 3
-            else: m_score['eficiencia_conversion'] = max(0, val*2)
-        else:
-            m_score['eficiencia_conversion'] = 0
-            
-        # 9. Tendencia (Snapshot = Neutral 5.0)
-        m_score['tendencia'] = 5.0
-        
-        # 10. Diversificación
-        # Est. bets per type
-        bets_c = ggr_c / 0.05
-        bets_d = ggr_d / 0.05
-        total_bets = bets_c + bets_d
-        if total_bets > 0:
-            hhi = (bets_c/total_bets)**2 + (bets_d/total_bets)**2
-            m_score['diversificacion'] = (1 - hhi) * 10
-        else:
-            m_score['diversificacion'] = 0
-            
-        # 11. Calidad
-        if players > 0:
-            avg = total_bets / players
-            if avg > 10000: m_score['calidad_jugadores'] = 8
-            elif avg > 5000: m_score['calidad_jugadores'] = 6
-            elif avg > 1000: m_score['calidad_jugadores'] = 4
-            else: m_score['calidad_jugadores'] = 2
-        else:
-            m_score['calidad_jugadores'] = 0
-            
-        # Calculate Weighted Score
-        total_s = 0
-        for k, weight in PESOS_METRICAS.items():
-            total_s += m_score.get(k, 0) * weight
-            
-        scores_mensuales.append(total_s)
-        all_monthly_metrics.append(m_score)
-
-    df_mensual['score_global'] = scores_mensuales
-    
-    # Store individual metric scores per month
-    for metric_key in PESOS_METRICAS.keys():
-        df_mensual[metric_key] = [m.get(metric_key, 0) for m in all_monthly_metrics]
-    
-    # Add Clase and Risk_Safe per month
-    clases = []
-    risk_flags = []
-    for s in scores_mensuales:
-        cat, _ = categorizar_agente(s)
-        clases.append(cat)
-        risk_flags.append(1 if 'A' in cat or 'B' in cat else 0)
-    df_mensual['Clase'] = clases
-    df_mensual['Risk_Safe'] = risk_flags
+            metricas['calidad_jugadores'] = 2.0
+    else:
+        metricas['calidad_jugadores'] = 0
     
     return metricas, df_mensual
 
-# ============================================================================
-# LÓGICA DE SCORING Y CATEGORIZACIÓN
-# ============================================================================
-
 def calcular_score_total(metricas):
-    return sum(v * PESOS_METRICAS.get(k, 0) for k, v in metricas.items())
+    """Calcula el score total ponderado"""
+    score = 0
+    for metrica, valor in metricas.items():
+        if metrica in PESOS_METRICAS:
+            score += valor * PESOS_METRICAS[metrica]
+    return score
 
 def categorizar_agente(score):
-    if score >= 8.5: return "A+++", "Excelencia excepcional"
-    elif score >= 8.0: return "A++", "Excelencia alta"
-    elif score >= 7.5: return "A+", "Excelencia"
-    elif score >= 6.5: return "B+++", "Consolidado superior"
-    elif score >= 5.5: return "B++", "Consolidado alto"
-    elif score >= 4.5: return "B+", "Consolidado"
-    elif score >= 3.5: return "C+++", "En desarrollo avanzado"
-    elif score >= 2.5: return "C++", "En desarrollo medio"
-    elif score >= 1.5: return "C+", "Principiante"
-    else: return "C", "Crítico"
+    """Categoriza al agente según su score total"""
+    if score >= 9.0:
+        return "A+++", "Excelencia excepcional - Líderes absolutos"
+    elif score >= 8.5:
+        return "A++", "Excelencia alta - Top tier sobresaliente"
+    elif score >= 8.0:
+        return "A+", "Excelencia - Muy alto desempeño"
+    elif score >= 7.0:
+        return "B+++", "Consolidado superior - Buen track record"
+    elif score >= 6.5:
+        return "B++", "Consolidado alto - Desempeño sólido"
+    elif score >= 6.0:
+        return "B+", "Consolidado - Estable y confiable"
+    elif score >= 5.0:
+        return "C+++", "En desarrollo avanzado - Progreso visible"
+    elif score >= 4.0:
+        return "C++", "En desarrollo medio - Requiere mejoras"
+    elif score >= 3.0:
+        return "C+", "Principiante - Necesita atención"
+    else:
+        return "C", "Crítico - Intervención urgente"
+
 
 # ============================================================================
-# LÓGICA DE ANÁLISIS PROFUNDO (De dashboard_agentes_limpio1.py)
+# DERIVADOS: MÉTRICAS MENSUALES SIN DUPLICAR LÓGICA
 # ============================================================================
 
+def calcular_metricas_mensuales(df_agente: pd.DataFrame, total_jugadores_global: int = 1, mode: str = "snapshot") -> pd.DataFrame:
+    """
+    Construye un DataFrame mensual con las 11 métricas (0-10) y score_global,
+    SIN reimplementar ninguna fórmula.
+
+    mode:
+      - "snapshot": usa SOLO filas del mes (mes == M)
+      - "cumulative": usa filas hasta el mes (mes <= M)
+    """
+    if mode not in ("snapshot", "cumulative"):
+        raise ValueError("mode debe ser 'snapshot' o 'cumulative'")
+
+    if df_agente is None or len(df_agente) == 0 or 'creado' not in df_agente.columns:
+        return pd.DataFrame(columns=["mes", *PESOS_METRICAS.keys(), "score_global"])
+
+    df = df_agente.copy()
+    df['creado'] = pd.to_datetime(df['creado'], errors='coerce')
+    df = df.dropna(subset=['creado'])
+    if len(df) == 0:
+        return pd.DataFrame(columns=["mes", *PESOS_METRICAS.keys(), "score_global"])
+
+    df['mes'] = df['creado'].dt.to_period('M')
+    meses = sorted(df['mes'].unique())
+
+    filas = []
+    for mes in meses:
+        if mode == "snapshot":
+            df_f = df[df['mes'] == mes]
+        else:
+            df_f = df[df['mes'] <= mes]
+
+        metricas_mes, _ = calcular_metricas_agente(df_f, total_jugadores_global)
+        score_mes = calcular_score_total(metricas_mes)
+
+        fila = {"mes": mes}
+        for k in PESOS_METRICAS.keys():
+            fila[k] = metricas_mes.get(k, 0)
+        fila["score_global"] = score_mes
+        filas.append(fila)
+
+    return pd.DataFrame(filas)
+
+
+def calcular_metricas_agente_refactor(
+    df_agente: pd.DataFrame,
+    total_jugadores_global: int = 1,
+    monthly_mode: str = "snapshot",
+    debug_validate: bool = False
+):
+    """
+    Wrapper oficial para este módulo.
+
+    Devuelve:
+      1) metricas_globales: métricas (0-10) calculadas con la lógica original sobre df completo
+      2) df_mensual_original: agregación mensual que retorna la lógica original
+      3) df_metricas_mensuales: métricas por mes (snapshot/cumulative) derivadas SOLO por filtrado
+
+    Importante: NO hay una segunda lógica.
+    """
+    metricas_globales, df_mensual_original = calcular_metricas_agente(df_agente, total_jugadores_global)
+
+    df_metricas_mensuales = calcular_metricas_mensuales(
+        df_agente=df_agente,
+        total_jugadores_global=total_jugadores_global,
+        mode=monthly_mode
+    )
+
+    if debug_validate:
+        # Validación mínima: resultado global debe coincidir con la llamada directa (misma función).
+        metricas_directo, _ = calcular_metricas_agente(df_agente, total_jugadores_global)
+        if metricas_directo != metricas_globales:
+            raise AssertionError("Validación fallida: métricas globales difieren de la fuente original.")
+
+    return metricas_globales, df_mensual_original, df_metricas_mensuales
+
+
+# Alias para compatibilidad con código existente que esperaba mensualidad.
+def calcular_metricas_agente_con_mensual(df_agente, total_jugadores_global=1, monthly_mode="snapshot", debug_validate=False):
+    return calcular_metricas_agente_refactor(df_agente, total_jugadores_global, monthly_mode, debug_validate)
 
 
 # ============================================================================
-# LÓGICA DE CRÉDITO Y PREDICCIÓN
+# CRÉDITO Y PREDICCIÓN (se mantiene lo existente en este módulo)
 # ============================================================================
 
 def calcular_credito_sugerido(df_mensual, score, metricas):
@@ -442,3 +519,8 @@ def predecir_ggr(df_mensual):
         return ggr[-1]*0.6 + ggr[-2]*0.4
     else:
         return ggr[-1]
+
+
+# Alias de nombre usado en el dashboard original
+def predecir_ggr_proximo_mes(df_mensual: pd.DataFrame) -> float:
+    return float(predecir_ggr(df_mensual))

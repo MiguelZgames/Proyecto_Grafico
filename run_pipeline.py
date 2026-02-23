@@ -9,7 +9,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), 'src'))
 from data_loader import load_data
 from report_html import generate_html_report
 from logic_analytics import (
-    calcular_metricas_agente, calcular_score_total,
+    calcular_metricas_agente_con_mensual, calcular_score_total,
     categorizar_agente, calcular_credito_sugerido,
     predecir_ggr
 )
@@ -44,7 +44,21 @@ def main():
             df_agent = df[df['nombre_usuario_agente'] == agent_name].copy()
             
             # --- 1. CORE METRICS & SCORING ---
-            metricas, df_mensual = calcular_metricas_agente(df_agent, total_jugadores_global)
+            metricas, df_mensual_orig, df_mensual_mets = calcular_metricas_agente_con_mensual(df_agent, total_jugadores_global)
+            df_mensual = pd.merge(df_mensual_orig, df_mensual_mets, on='mes', how='left')
+            
+            # Fallback for logic_analytics changes
+            if 'calculo_comision' not in df_mensual.columns:
+                df_mensual['calculo_comision'] = df_mensual['calculo_ngr']
+            
+            # Add Clase and Risk_Safe per month (since it was removed from logic_analytics inner loop)
+            def compute_clase(s):
+                if pd.notna(s):
+                    return categorizar_agente(s)[0]
+                return 'C'
+            df_mensual['Clase'] = df_mensual['score_global'].apply(compute_clase)
+            df_mensual['Risk_Safe'] = df_mensual['Clase'].apply(lambda c: 1 if ('A' in c or 'B' in c) else 0)
+
             score = calcular_score_total(metricas)
             categoria, descripcion = categorizar_agente(score)
             credito, detalles = calcular_credito_sugerido(df_mensual, score, metricas)
