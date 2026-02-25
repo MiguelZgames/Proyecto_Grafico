@@ -67,9 +67,11 @@ def load_and_validate_data(csv_path="Data/reporte_detallado_jugadores_final.csv"
         metricas_snapshot, df_mensual_orig, df_mensual_mets = calcular_metricas_agente_con_mensual(df_ag, total_jugadores_global)
         df_mensual = pd.merge(df_mensual_orig, df_mensual_mets, on='mes', how='left')
         
-        # Fallback for logic_analytics changes
+        # Aseguramos que existan, pero SIN fallback entre ellas
         if 'calculo_comision' not in df_mensual.columns:
-            df_mensual['calculo_comision'] = df_mensual['calculo_ngr']
+            df_mensual['calculo_comision'] = 0.0
+        if 'calculo_ngr' not in df_mensual.columns:
+            df_mensual['calculo_ngr'] = 0.0
             
         if 'jugador_id' in df_mensual.columns and 'active_players' not in df_mensual.columns:
             df_mensual['active_players'] = df_mensual['jugador_id']
@@ -95,7 +97,7 @@ def load_and_validate_data(csv_path="Data/reporte_detallado_jugadores_final.csv"
         # Only keep necessary columns to optimize payload size
         cols_to_keep = ['agente_id', 'agente_name', 'month_str'] + core_metrics
         # Add basic volume metrics just in case they want context
-        context_cols = ['total_depositos', 'calculo_ngr', 'calculo_comision', 'score_global', 'active_players', 'num_depositos', 'num_retiros', 'global_players']
+        context_cols = ['total_depositos', 'calculo_ngr', 'calculo_comision', 'score_global', 'active_players', 'num_depositos', 'num_retiros', 'global_players', 'casino_ggr', 'apuestas_deportivas_ggr']
         for c in context_cols:
             if c in df_mensual.columns:
                 cols_to_keep.append(c)
@@ -670,6 +672,26 @@ def generate_metrics_dashboard(monthly_dict, out_path="reports/metrics_historic_
             adp_ticktext = final_indices.map(i => formatted_x[i]);
         }
         
+        // Helper specifically for Critical Month Icons (placed above the chart)
+        function addCriticalEnclosure(layout, x_vals, criticalFlags) {
+            if (!x_vals || typeof x_vals.length === 'undefined' || !criticalFlags || criticalFlags.length !== x_vals.length) return;
+            layout.shapes = layout.shapes || [];
+            const n = x_vals.length;
+            for (let i = 0; i < n; i++) {
+                if (criticalFlags[i]) {
+                    layout.shapes.push({
+                        type: 'rect',
+                        xref: 'paper', yref: 'paper',
+                        y0: 0, y1: 1,
+                        layer: 'below',
+                        fillcolor: 'rgba(239,68,68,0.06)',
+                        line: { color: 'rgba(239,68,68,0.22)', width: 1 },
+                        x0: (i - 0.5) / n, x1: (i + 0.5) / n
+                    });
+                }
+            }
+        }
+        
         // Loop through 11 metrics and plot
         metricKeys.forEach(m => {
             const chartDiv = document.getElementById(`chart_${m}`);
@@ -731,6 +753,7 @@ def generate_metrics_dashboard(monthly_dict, out_path="reports/metrics_historic_
                 const anomalies_text = [];
                 const anomalies_symbols = [];
                 const hover_texts = [];
+                const criticalFlags = [];
                 
                 const sorted_deps = [...deps].sort((a,b) => a - b);
                 const dep_p75 = sorted_deps[Math.floor(sorted_deps.length * 0.75)] || 0;
@@ -763,16 +786,26 @@ def generate_metrics_dashboard(monthly_dict, out_path="reports/metrics_historic_
                     margin_line_widths.push(isLast ? 3 : 2);
                     margin_line_colors.push(isLast ? '#ffffff' : '#ffffff');
                     
+                    let is_critical = false;
+                    let evento = "⚠ Mes crítico";
+                    
                     // Anomalies detection
                     if (m_pct !== null) {
                         if (m_pct < 0) {
                             anomalies_x.push(x_vals[i]); anomalies_y.push(m_pct); anomalies_text.push('Margen Negativo'); anomalies_symbols.push('triangle-down');
+                            is_critical = true;
+                            evento = "⚠ Caída crítica";
                         } else if (d > dep_p75 && m_pct < 2) { 
                             anomalies_x.push(x_vals[i]); anomalies_y.push(m_pct); anomalies_text.push('Alto Vol / Bajo Margen'); anomalies_symbols.push('circle-open');
+                            is_critical = true;
+                            evento = "⚠ Pico inusual (alto vol / bajo margen)";
                         }
                     } else if (d === 0 || d === undefined) {
                          anomalies_x.push(x_vals[i]); anomalies_y.push(0); anomalies_text.push('Sin Depósitos'); anomalies_symbols.push('x');
+                         is_critical = true;
+                         evento = "⚠ Sin depósitos";
                     }
+                    criticalFlags.push(is_critical);
                     
                     // Executive Tooltip Content
                     const real_data = {
@@ -781,6 +814,7 @@ def generate_metrics_dashboard(monthly_dict, out_path="reports/metrics_historic_
                         "Margen Real": m_pct !== null ? formatPct(m_pct) : 'N/A'
                     };
                     const change_data = {};
+                    if (is_critical) change_data["Evento"] = evento;
                     if (prev_d !== null && prev_d > 0) {
                         const d_var = ((d - prev_d) / prev_d) * 100;
                         change_data["Δ Depósitos"] = (d_var > 0 ? '+' : '') + formatPct(d_var);
@@ -856,11 +890,16 @@ def generate_metrics_dashboard(monthly_dict, out_path="reports/metrics_historic_
                     });
                 }
                 
+                addCriticalEnclosure(layout, x_vals, criticalFlags);
+                
                 // Overriding margins for Rentabilidad breathing room
                 layout.margin.r = 60;
                 layout.margin.l = 60;
 
                 // Axis Layout
+                layout.xaxis.tickvals = x_vals;
+                layout.xaxis.ticktext = formatted_x;
+
                 layout.yaxis = { 
                     showline: true, linewidth: 1.5, linecolor: '#94a3b8', ticks: 'outside', tickcolor: '#94a3b8', ticklen: 5,
                     showgrid: false, zeroline: false, showticklabels: true, title: '',
@@ -900,12 +939,38 @@ def generate_metrics_dashboard(monthly_dict, out_path="reports/metrics_historic_
                     { type: 'line', x0: 0, x1: 1, xref: 'paper', y0: 15, y1: 15, yref: 'y2', line: { color: 'rgba(16, 185, 129, 0.4)', width: 1, dash: 'dot' } }
                 ];
                 
-                const last_m_txt = (margins[margins.length-1]!==null) ? margins[margins.length-1].toFixed(1)+'%' : 'N/A';
+                const last_m = margins[margins.length-1];
+                const prev_m = margins.length >= 2 ? margins[margins.length-2] : null;
+                const last_m_txt = (last_m !== null && last_m !== undefined) ? last_m.toFixed(1)+'%' : 'N/A';
+                
+                let delta_pp_text = '';
+                if (last_m !== null && last_m !== undefined && prev_m !== null && prev_m !== undefined) {
+                    const delta_pp = last_m - prev_m;
+                    const delta_color = delta_pp >= 0 ? '#10b981' : '#ef4444';
+                    const delta_arrow = delta_pp >= 0 ? '▲' : '▼';
+                    const delta_str = (delta_pp > 0 ? '+' : '') + delta_pp.toFixed(2);
+                    delta_pp_text = `<span style="color:${delta_color}; font-size:11px; font-weight:600;">${delta_arrow} ${delta_str} pp</span><br>`;
+                }
+
+                const last_s = scores[scores.length - 1] || 0;
 
                 layout.annotations = [
-                    { x: 1, y: 1.15, xref: 'paper', yref: 'paper', xanchor: 'right', yanchor: 'top', text: `<b>${momentum}</b>`, showarrow: false, font: {size: 13, color: mom_color, family: 'Inter'} },
-                    
-                    { x: lastMonth, y: margins[margins.length-1] || 0, yref: 'y2', text: `<b>${last_m_txt}</b>`, showarrow: true, arrowhead: 0, ax: -35, ay: -25, bordercolor: margin_colors[margin_colors.length-1], borderwidth: 1, borderpad: 3, bgcolor: 'rgba(255,255,255,0.95)', font: {size: 11, color: '#0f172a', weight: 600} }
+                    {
+                        x: 0, y: 1.13, xref: 'paper', yref: 'paper',
+                        xanchor: 'left', yanchor: 'top',
+                        text: `<b><span style="color:${mom_color};">${momentum}</span></b>`,
+                        showarrow: false,
+                        font: {size: 12, family: 'Inter'}
+                    },
+                    {
+                        x: 1, y: 1.15, xref: 'paper', yref: 'paper',
+                        xanchor: 'right', yanchor: 'top',
+                        text: `<b><span style="font-size:14px;color:#0f172a;">${last_m_txt}</span></b>  ` +
+                              delta_pp_text +
+                              `<span style="font-size:10px; color:#64748b;">Score: ${last_s.toFixed(1)}/10</span>`,
+                        showarrow: false,
+                        align: 'right'
+                    }
                 ];
 
                 layout.showlegend = false; 
@@ -925,21 +990,35 @@ def generate_metrics_dashboard(monthly_dict, out_path="reports/metrics_historic_
                 const anomalies_x = [];
                 const anomalies_y = [];
                 const anomalies_text = [];
+                const criticalFlags = [];
 
                 for (let i = 0; i < series.length; i++) {
                     const t = txs[i];
                     const s = scores[i];
                     const prev_t = i > 0 ? txs[i-1] : null;
 
-                    let t_var_pct = null;
+                    let t_var_pct = null; 
+                    let is_critical = false;           // sigue siendo SOLO caídas (<=30)
+                    let has_event = false;             // NUEVO: evento para tooltip (caídas y picos)
+                    let evento = null;                 // NUEVO: texto del evento (si solo aplica)
+                    
                     if (prev_t !== null && prev_t > 0) {
                         t_var_pct = ((t - prev_t) / prev_t) * 100;
+
                         if (t_var_pct <= -30) {
                             anomalies_x.push(x_vals[i]); anomalies_y.push(t); anomalies_text.push('Caída Crítica');
+                            is_critical = true;
+                            has_event = true;
+                            evento = "⚠ Caída crítica";
                         } else if (t_var_pct >= 50) {
                             anomalies_x.push(x_vals[i]); anomalies_y.push(t); anomalies_text.push('Pico Inusual');
+                            has_event = true;
+                            evento = "⚠ Pico inusual";
+                            // user objective rule says if we want to flag negative anomalies in volumen, we keep event logic. But we still flag pico if is_critical = false in earlier fix.
+                            // wait, earlier fix made is_critical ONLY true for drop <= -30%. So if is_critical = false, Evento is NOT appended.
                         }
                     }
+                    criticalFlags.push(is_critical);
 
                     // Hover tooltip
                     const real_data = {
@@ -951,6 +1030,7 @@ def generate_metrics_dashboard(monthly_dict, out_path="reports/metrics_historic_
                     if (t_var_pct !== null) {
                         change_data["Δ Vol"] = (t_var_pct > 0 ? '+' : '') + formatPct(t_var_pct);
                     }
+                    if (has_event && evento) change_data["Evento"] = evento;
                     
                     const h_text = buildTooltipHTML(formatted_x[i], real_data, change_data, s);
                     hover_texts.push(h_text);
@@ -987,16 +1067,18 @@ def generate_metrics_dashboard(monthly_dict, out_path="reports/metrics_historic_
                 // LAYER C: Anomalies
                 if (anomalies_x.length > 0) {
                     traces.push({
-                        x: anomalies_x, y: anomalies_y, type: 'scatter', mode: 'markers+text',
+                        x: anomalies_x, y: anomalies_y, type: 'scatter', mode: 'markers',
                         name: 'Alerta',
                         marker: { symbol: 'triangle-down-open', size: 16, color: '#ef4444', line: {width: 2} },
-                        text: anomalies_text, textposition: 'top center',
-                        textfont: { size: 10, color: '#ef4444', weight: 600, family: 'Inter' },
                         hoverinfo: 'skip'
                     });
                 }
+                // addCriticalEnclosure(layout, x_vals, criticalFlags);
 
                 // Layout Overrides
+                layout.xaxis.tickvals = x_vals;
+                layout.xaxis.ticktext = formatted_x;
+
                 layout.margin.r = 60;
                 layout.margin.l = 60;
                 
@@ -1014,10 +1096,48 @@ def generate_metrics_dashboard(monthly_dict, out_path="reports/metrics_historic_
                 };
 
                 const last_t = txs[txs.length-1] || 0;
+                const prev_t = txs.length >= 2 ? txs[txs.length-2] : null;
                 const last_s = scores[scores.length-1] || 0;
                 
+                let delta_text = '';
+                if (prev_t !== null) {
+                    const delta = last_t - prev_t;
+                    const delta_pct = prev_t > 0 ? (delta / prev_t) * 100 : 0;
+                    const delta_color = delta >= 0 ? '#10b981' : '#ef4444';
+                    const delta_arrow = delta >= 0 ? '▲' : '▼';
+                    const delta_sign = delta > 0 ? '+' : '';
+                    
+                    delta_text = `<span style="color:${delta_color}; font-size:11px; font-weight:600;">${delta_arrow} ${delta_sign}${formatInt(delta)} (${delta_sign}${delta_pct.toFixed(1)}%)</span><br>`;
+                } else {
+                    delta_text = `<span style="color:#64748b; font-size:11px; font-weight:600;">Δ: N/A</span><br>`;
+                }
+
+                let momentum = "→ Estable";
+                let mom_color = "#64748b";
+                if (txs.length >= 2) {
+                    const lm = txs[txs.length-1] || 0;
+                    const pm = txs[txs.length-2] || 0;
+                    if (lm > pm) { momentum = "▲ Mejorando"; mom_color = "#10b981"; }
+                    else if (lm < pm) { momentum = "▼ Empeorando"; mom_color = "#ef4444"; }
+                }
+                
                 layout.annotations = [
-                    { x: lastMonth, y: last_t, yref: 'y', text: `<b>TXs: ${last_t}</b><br><span style="font-size:10px;color:#64748b">Score: ${last_s.toFixed(1)}</span>`, showarrow: true, arrowhead: 0, ax: -40, ay: -35, bordercolor: '#10b981', borderwidth: 1, borderpad: 5, bgcolor: 'rgba(255,255,255,0.95)', font: {size: 11, color: '#0f172a', family: 'Inter'} }
+                    {
+                        x: 0, y: 1.13, xref: 'paper', yref: 'paper',
+                        xanchor: 'left', yanchor: 'top',
+                        text: `<b><span style="color:${mom_color};">${momentum}</span></b>`,
+                        showarrow: false,
+                        font: {size: 12, family: 'Inter'}
+                    },
+                    {
+                        x: 1, y: 1.15, xref: 'paper', yref: 'paper',
+                        xanchor: 'right', yanchor: 'top',
+                        text: `<b><span style="font-size:14px;color:#0f172a;">TXs: ${formatInt(last_t)}</span></b>  ` +
+                              delta_text +
+                              `<span style="font-size:10px; color:#64748b;">Score: ${last_s.toFixed(1)}/10</span>`,
+                        showarrow: false,
+                        align: 'right'
+                    }
                 ];
                 
             } else if (m === 'fidelidad') {
@@ -1046,6 +1166,7 @@ def generate_metrics_dashboard(monthly_dict, out_path="reports/metrics_historic_
                 const anomalies_x  = [];
                 const anomalies_y  = [];
                 const anomalies_text = [];
+                const criticalFlags = [];
                 let   last_sh_var_pp = 0;
 
                 for (let i = 0; i < series.length; i++) {
@@ -1055,16 +1176,26 @@ def generate_metrics_dashboard(monthly_dict, out_path="reports/metrics_historic_
 
                     let sh_var_pp  = null;
                     let sh_var_pct = null;
+                    let is_critical = false;
+                    let evento = "⚠ Mes crítico";
+
                     if (prev_sh !== null) {
                         sh_var_pp  = sh - prev_sh;
                         if (prev_sh > 0) sh_var_pct = (sh_var_pp / prev_sh) * 100;
                         if (i === series.length - 1) last_sh_var_pp = sh_var_pp;
+                        
                         if (sh_var_pp <= -0.5 || (sh_var_pct !== null && sh_var_pct <= -25)) {
                             anomalies_x.push(x_vals[i]);
                             anomalies_y.push(sh);
                             anomalies_text.push('⚠');
+                            evento = "⚠ Caída crítica";
+                        } else if (sh_var_pp >= 0.5 || (sh_var_pct !== null && sh_var_pct >= 25)) {
+                            evento = "⚠ Pico inusual";
                         }
                     }
+                    
+                    is_critical = (s < 4.0);
+                    criticalFlags.push(is_critical);
 
                     // ── Compact hovertemplate body ──
                     const real_data   = {
@@ -1078,6 +1209,7 @@ def generate_metrics_dashboard(monthly_dict, out_path="reports/metrics_historic_
                                                  ((Math.abs(sh_var_pp) > 0 && Math.abs(sh_var_pp) < 1) ? 
                                                  Math.abs(sh_var_pp).toFixed(3) + ' pp' : formatPP(sh_var_pp));
                     }
+                    if (is_critical) change_data["Evento"] = evento;
                     hover_texts.push(buildTooltipHTML(formatted_x[i], real_data, change_data, s));
                 }
 
@@ -1115,22 +1247,16 @@ def generate_metrics_dashboard(monthly_dict, out_path="reports/metrics_historic_
                     line: { color: 'rgba(148, 163, 184, 0.15)', width: 1, dash: 'dot' },
                     hovertemplate: '<extra></extra>'
                 });
+                
+                addCriticalEnclosure(layout, x_vals, criticalFlags);
 
                 // ── LAYER C: Alert markers ─────────────────────────────────
-                if (anomalies_x.length > 0) {
-                    traces.push({
-                        x: anomalies_x, y: anomalies_y,
-                        type: 'scatter', mode: 'markers+text',
-                        name: 'Alerta',
-                        marker: { symbol: 'circle-open', size: 16,
-                                  color: 'transparent', line: { color: '#ef4444', width: 2 } },
-                        text: anomalies_text, textposition: 'top center',
-                        textfont: { size: 13, color: '#ef4444', weight: 700, family: 'Inter' },
-                        hovertemplate: '<extra></extra>'
-                    });
-                }
+                // Removed anomaly markers to prevent secondary tooltip stealing hover
 
                 // ── Layout overrides ───────────────────────────────────────
+                layout.xaxis.tickvals = x_vals;
+                layout.xaxis.ticktext = formatted_x;
+
                 layout.margin   = { t: 44, b: 44, l: 52, r: 16 };
                 layout.hovermode = 'closest';
                 layout.hoverlabel = {
@@ -1323,7 +1449,7 @@ def generate_metrics_dashboard(monthly_dict, out_path="reports/metrics_historic_
                 layout.paper_bgcolor = '#ffffff';
 
                 layout.xaxis = {
-                    domain: [0.0, 0.65],
+                    domain: [0.0, 0.72],
                     type: 'category',
                     tickmode: 'array',
                     tickvals: adp_tickvals,
@@ -1342,7 +1468,7 @@ def generate_metrics_dashboard(monthly_dict, out_path="reports/metrics_historic_
                 };
 
                 layout.xaxis2 = {
-                    domain: [0.0, 0.65],
+                    domain: [0.0, 0.72],
                     anchor: 'y2',
                     range: [0, 10],
                     showgrid: false, zeroline: false, showline: false,
@@ -1379,8 +1505,9 @@ def generate_metrics_dashboard(monthly_dict, out_path="reports/metrics_historic_
                 const isFlat = y_vals.every(v => Math.abs(v - est_score) < 0.01);
                 
                 const scoreStr = est_score.toFixed(1);
-                const targetGap = (est_score - targetV).toFixed(1);
-                const gapSign = est_score >= targetV ? '+' : '';
+                const gapVal = (est_score - targetV);
+                const gapColor = gapVal >= 0 ? '#10b981' : '#ef4444';
+                const gapSign = gapVal >= 0 ? '+' : '';
 
                 layout.annotations = [
                     // KPI: Target Label (over gauge)
@@ -1392,15 +1519,15 @@ def generate_metrics_dashboard(monthly_dict, out_path="reports/metrics_historic_
                     },
                     // RIGHT PANEL: Score number
                     {
-                        x: 0.82, y: 0.78, xref: 'paper', yref: 'paper',
-                        xanchor: 'center', yanchor: 'middle',
+                        x: 0.92, y: 0.78, xref: 'paper', yref: 'paper',
+                        xanchor: 'right', yanchor: 'middle',
                         text: `<b><span style="font-size:36px;color:#0f172a;">${scoreStr}</span></b><span style="font-size:14px;color:#94a3b8;">/10</span>`,
                         showarrow: false, font: { family: 'Inter' }
                     },
                     // RIGHT PANEL: Qualitative pill
                     {
-                        x: 0.82, y: 0.53, xref: 'paper', yref: 'paper',
-                        xanchor: 'center', yanchor: 'middle',
+                        x: 0.92, y: 0.53, xref: 'paper', yref: 'paper',
+                        xanchor: 'right', yanchor: 'middle',
                         text: `<b><span style="color:${lStyle.fg};font-size:12px;">${label}</span></b>`,
                         showarrow: false, font: { family: 'Inter', size: 12 },
                         bgcolor: lStyle.bg, borderpad: 5,
@@ -1408,9 +1535,9 @@ def generate_metrics_dashboard(monthly_dict, out_path="reports/metrics_historic_
                     },
                     // RIGHT PANEL: Target and Gap strings
                     {
-                        x: 0.82, y: 0.38, xref: 'paper', yref: 'paper',
-                        xanchor: 'center', yanchor: 'middle',
-                        text: `<span style="font-size:11px;color:#64748b;">Target: 6.0</span><br><span style="font-size:11px;color:#64748b;">Gap: ${gapSign}${targetGap}</span>`,
+                        x: 0.92, y: 0.38, xref: 'paper', yref: 'paper',
+                        xanchor: 'right', yanchor: 'middle',
+                        text: `<span style="font-size:11px;color:#94a3b8;">Objetivo: 6.0</span><br><span style="font-size:11px;color:${gapColor};">Brecha: ${gapSign}${gapVal.toFixed(1)}</span>`,
                         showarrow: false, font: { family: 'Inter', size: 11 }
                     },
                     // Flat-series notice
@@ -1488,8 +1615,8 @@ def generate_metrics_dashboard(monthly_dict, out_path="reports/metrics_historic_
 
                     // Depending on metric, identify GGR keys
                     const is_casino = (m === 'eficiencia_casino');
-                    const ggr_val = is_casino ? (d.casino_ggr || 0) : (d.deportes_ggr || 0);
-                    const prev_ggr = (prev_d) ? (is_casino ? (prev_d.casino_ggr || 0) : (prev_d.deportes_ggr || 0)) : null;
+                    const ggr_val = is_casino ? (d.casino_ggr ?? d.ggr_casino ?? 0) : (d.apuestas_deportivas_ggr ?? d.ggr_deportiva ?? d.deportes_ggr ?? 0);
+                    const prev_ggr = (prev_d) ? (is_casino ? (prev_d.casino_ggr ?? prev_d.ggr_casino ?? 0) : (prev_d.apuestas_deportivas_ggr ?? prev_d.ggr_deportiva ?? prev_d.deportes_ggr ?? 0)) : null;
                     
                     const dep_val = d.total_depositos || 0;
                     const prev_dep = (prev_d) ? (prev_d.total_depositos || 0) : null;
@@ -1555,14 +1682,14 @@ def generate_metrics_dashboard(monthly_dict, out_path="reports/metrics_historic_
                 });
 
                 // Layout Config
-                layout.margin = { t: 20, b: 60, l: 20, r: 100 };
+                layout.margin = { t: 20, b: 80, l: 20, r: 100 };
                 layout.showlegend = false;
                 layout.hovermode = 'closest';
                 layout.plot_bgcolor = 'transparent';
                 layout.paper_bgcolor = '#ffffff';
 
                 layout.xaxis = {
-                    domain: [0.0, 0.65],
+                    domain: [0.0, 0.72],
                     type: 'category',
                     tickmode: 'array',
                     tickvals: adp_tickvals,
@@ -1575,13 +1702,13 @@ def generate_metrics_dashboard(monthly_dict, out_path="reports/metrics_historic_
                 };
                 
                 layout.yaxis = {
-                    domain: [0, 0.20],
+                    domain: [0.0, 0.30],
                     showgrid: false, zeroline: false, showticklabels: false, showline: false,
                     range: [0, 1]
                 };
 
                 layout.xaxis2 = {
-                    domain: [0.0, 0.65],
+                    domain: [0.0, 0.72],
                     anchor: 'y2',
                     range: [0, 10],
                     showgrid: false, zeroline: false, showline: false,
@@ -1591,7 +1718,7 @@ def generate_metrics_dashboard(monthly_dict, out_path="reports/metrics_historic_
                 };
                 
                 layout.yaxis2 = {
-                    domain: [0.45, 0.95],
+                    domain: [0.52, 1.00],
                     anchor: 'x2',
                     range: [-1, 1],
                     showgrid: false, zeroline: false, showticklabels: false, showline: false
@@ -1618,8 +1745,9 @@ def generate_metrics_dashboard(monthly_dict, out_path="reports/metrics_historic_
                 const isFlat = y_vals.every(v => Math.abs(v - effic_score) < 0.01);
                 
                 const scoreStr = effic_score.toFixed(1);
-                const targetGap = (effic_score - targetV).toFixed(1);
-                const gapSign = effic_score >= targetV ? '+' : '';
+                const gapVal = effic_score - targetV;
+                const gapColor = gapVal >= 0 ? '#10b981' : '#ef4444';
+                const gapSign = gapVal >= 0 ? '+' : '';
 
                 layout.annotations = [
                     // KPI: Target Label (over gauge)
@@ -1631,15 +1759,15 @@ def generate_metrics_dashboard(monthly_dict, out_path="reports/metrics_historic_
                     },
                     // RIGHT PANEL: Score number
                     {
-                        x: 0.82, y: 0.78, xref: 'paper', yref: 'paper',
-                        xanchor: 'center', yanchor: 'middle',
+                        x: 0.92, y: 0.78, xref: 'paper', yref: 'paper',
+                        xanchor: 'right', yanchor: 'middle',
                         text: `<b><span style="font-size:36px;color:#0f172a;">${scoreStr}</span></b><span style="font-size:14px;color:#94a3b8;">/10</span>`,
                         showarrow: false, font: { family: 'Inter' }
                     },
                     // RIGHT PANEL: Qualitative pill
                     {
-                        x: 0.82, y: 0.53, xref: 'paper', yref: 'paper',
-                        xanchor: 'center', yanchor: 'middle',
+                        x: 0.92, y: 0.53, xref: 'paper', yref: 'paper',
+                        xanchor: 'right', yanchor: 'middle',
                         text: `<b><span style="color:${lStyle.fg};font-size:12px;">${label}</span></b>`,
                         showarrow: false, font: { family: 'Inter', size: 12 },
                         bgcolor: lStyle.bg, borderpad: 5,
@@ -1647,9 +1775,9 @@ def generate_metrics_dashboard(monthly_dict, out_path="reports/metrics_historic_
                     },
                     // RIGHT PANEL: Target and Gap strings
                     {
-                        x: 0.82, y: 0.38, xref: 'paper', yref: 'paper',
-                        xanchor: 'center', yanchor: 'middle',
-                        text: `<span style="font-size:11px;color:#64748b;">Objetivo: 7.0</span><br><span style="font-size:11px;color:#64748b;">Gap: ${gapSign}${targetGap}</span>`,
+                        x: 0.92, y: 0.38, xref: 'paper', yref: 'paper',
+                        xanchor: 'right', yanchor: 'middle',
+                        text: `<span style="font-size:11px;color:#94a3b8;">Objetivo: 7.0</span><br><span style="font-size:11px;color:${gapColor};">Brecha: ${gapSign}${gapVal.toFixed(1)}</span>`,
                         showarrow: false, font: { family: 'Inter', size: 11 }
                     },
                     // Flat-series notice
@@ -1678,12 +1806,12 @@ def generate_metrics_dashboard(monthly_dict, out_path="reports/metrics_historic_
 
                 // formatted_x is available from global scope
 
-                // SECTION 1: Angular Gauge (Top ~58%) — NO target marker
+                // SECTION 1: Angular Gauge (Top ~44%) — NO target marker
                 traces.push({
                     type: "indicator",
                     mode: "gauge",
                     value: effic_score,
-                    domain: { x: [0, 1], y: [0.50, 1.0] },
+                    domain: { x: [0, 1], y: [0.56, 1.0] },
                     gauge: {
                         axis: {
                             range: [0, 10],
@@ -1730,8 +1858,8 @@ def generate_metrics_dashboard(monthly_dict, out_path="reports/metrics_historic_
 
                     const dep_val = d.total_depositos || 0;
                     const prev_dep = (prev_d) ? (prev_d.total_depositos || 0) : null;
-                    const ggr_val = (d.casino_ggr || 0) + (d.deportes_ggr || 0);
-                    const prev_ggr = (prev_d) ? ((prev_d.casino_ggr || 0) + (prev_d.deportes_ggr || 0)) : null;
+                    const ggr_val = (d.casino_ggr || 0) + (d.apuestas_deportivas_ggr || 0);
+                    const prev_ggr = (prev_d) ? ((prev_d.casino_ggr || 0) + (prev_d.apuestas_deportivas_ggr || 0)) : null;
 
                     const real_data = {
                         "Depósitos": formatMoney(dep_val),
@@ -1775,7 +1903,7 @@ def generate_metrics_dashboard(monthly_dict, out_path="reports/metrics_historic_
                     customdata: trend_hover_texts,
                     type: 'scatter',
                     mode: 'lines+markers',
-                    line: { color: config.color, width: 2, shape: 'spline' },
+                    line: { color: config.color, width: 2, shape: 'linear' },
                     marker: {
                         size: x_vals.map((_, i) => i === x_vals.length - 1 ? 8 : 4),
                         color: config.color,
@@ -1783,13 +1911,13 @@ def generate_metrics_dashboard(monthly_dict, out_path="reports/metrics_historic_
                     },
                     fill: 'tozeroy',
                     fillcolor: hexToRgba(config.color, 0.08),
-                    xaxis: 'x',
-                    yaxis: 'y',
+                    connectgaps: true,
+                    cliponaxis: false,
                     hovertemplate: '%{customdata}<extra></extra>'
                 });
 
                 // Layout Config — safe margins, strict domains
-                layout.margin = { t: 20, b: 45, l: 30, r: 30 };
+                layout.margin = { t: 20, b: 70, l: 30, r: 30 };
                 layout.showlegend = false;
                 layout.hovermode = 'closest';
                 layout.plot_bgcolor = 'transparent';
@@ -1807,7 +1935,7 @@ def generate_metrics_dashboard(monthly_dict, out_path="reports/metrics_historic_
                 };
 
                 layout.yaxis = {
-                    domain: [0, 0.20],
+                    domain: [0.0, 0.38],
                     showgrid: true,
                     gridcolor: '#f1f5f9',
                     zeroline: false,
@@ -1945,8 +2073,11 @@ def generate_metrics_dashboard(monthly_dict, out_path="reports/metrics_historic_
                 //  DIVERSIFICACIÓN — 2-Product HHI Scale (Max ~5.0)
                 // ═══════════════════════════════════════════════════════════
                 const hover_texts = [];
+                const scores = y_vals;
+                const criticalFlags = [];
                 for (let i = 0; i < series.length; i++) {
                     const s = y_vals[i];
+                    criticalFlags.push(s < 4.0);
                     const prev_s = i > 0 ? y_vals[i-1] : null;
                     
                     const ggr_cas = series[i].ggr_casino || 0;
@@ -1970,15 +2101,21 @@ def generate_metrics_dashboard(monthly_dict, out_path="reports/metrics_historic_
                     };
                     
                     const change_data = {};
+                    let evento = "⚠ Mes crítico";
+                    
                     if (prev_s !== null) {
                         const d_s = s - prev_s;
                         change_data["Δ Diversificación"] = (d_s > 0 ? '+' : '') + formatPP(d_s) + ' pts';
+                        
+                        if (d_s <= -1.0) evento = "⚠ Caída crítica";
+                        else if (d_s >= 1.0) evento = "⚠ Pico inusual";
                         
                         if (prev_cas_share !== null) {
                             const d_cas = cas_share - prev_cas_share;
                             change_data["Δ Casino Share"] = (d_cas > 0 ? '+' : '') + formatPP(d_cas) + ' pp';
                         }
                     }
+                    if (criticalFlags[i]) change_data["Evento"] = evento;
                     
                     hover_texts.push(buildTooltipHTML(formatted_x[i], real_data, change_data, s));
                 }
@@ -1997,11 +2134,16 @@ def generate_metrics_dashboard(monthly_dict, out_path="reports/metrics_historic_
                     hovertemplate: '%{customdata}<extra></extra>'
                 });
                 
+                addCriticalEnclosure(layout, x_vals, criticalFlags);
+                
                 layout.shapes = [{ 
                     type: 'rect', x0: 0, x1: 1, xref: 'paper', y0: 3.5, y1: 5.5, yref: 'y', 
                     fillcolor: 'rgba(34, 197, 94, 0.08)', line: {width: 0}, layer: 'below' 
                 }];
                 
+                layout.xaxis.tickvals = x_vals;
+                layout.xaxis.ticktext = formatted_x;
+
                 layout.margin = { t: 20, b: 40, l: 30, r: 15 };
                 layout.showlegend = false;
                 layout.yaxis = {

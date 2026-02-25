@@ -112,7 +112,8 @@ def calcular_metricas_agente(df_agente, total_jugadores_global=1):
     
     # Agrupar por mes
     df_mensual = df_agente.groupby('mes').agg({
-        'calculo_ngr': 'sum',  # NGR = comisión
+        'calculo_ngr': 'sum',  # NGR real
+        'calculo_comision': 'sum', # Comisión real
         'num_depositos': 'sum',  # Número de depósitos
         'num_retiros': 'sum',  # Número de retiros
         'total_depositos': 'sum',
@@ -179,8 +180,8 @@ def calcular_metricas_agente(df_agente, total_jugadores_global=1):
         metricas['fidelidad'] = 0
     
     # 4. Estabilidad Financiera (10%) - EF_log = 1 - (σ_log / μ_log)
-    # Usar comisiones mensuales (calculo_ngr = comis_calculada) con transformación logarítmica
-    comisiones_mensuales = df_mensual['calculo_ngr'].values
+    # Usar comisiones mensuales con transformación logarítmica
+    comisiones_mensuales = df_mensual['calculo_comision'].values
     if len(comisiones_mensuales) > 1:
         # Transformación logarítmica: x'_i = ln(x_i + |min(x)| + 1)
         min_comision = np.min(comisiones_mensuales)
@@ -473,8 +474,8 @@ def calcular_credito_sugerido(df_mensual, score, metricas):
     detalles = {'credito': 0, 'razon': 'Insuficiente data'}
     if len(df_mensual) == 0: return 0, detalles
     
-    ngr = df_mensual['calculo_ngr'].values
-    validos = ngr[ngr > 0]
+    comisiones = df_mensual['calculo_comision'].values
+    validos = comisiones[comisiones > 0]
     if len(validos) == 0: return 0, detalles
     
     p25 = np.percentile(validos, 25)

@@ -15,6 +15,7 @@ def load_data(file_path):
         rename_map = {
             'creado': 'creado', # fix potential conflict if date_evento is not found
             'date_evento': 'creado',
+            'ngr_total': 'calculo_ngr',
             'comis_calculada': 'calculo_comision', # Correct mapping per user
             'n_deposito': 'num_depositos',
             'n_retiro': 'num_retiros',
@@ -55,10 +56,7 @@ def load_data(file_path):
             
             df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
             
-        # Fallback: If calculo_ngr is 0 but calculo_comision has data, use commission as proxy for NGR logic
-        # strictly to preserve existing behavior where comis_calculada was mapped to ngr
-        if df['calculo_ngr'].sum() == 0 and df['calculo_comision'].sum() != 0:
-             df['calculo_ngr'] = df['calculo_comision']
+        # Ensure calculo_ngr and calculo_comision are independent. Fallback removed.
 
         # Fill ID and Username NaNs
         if 'nombre_usuario_agente' in df.columns:
