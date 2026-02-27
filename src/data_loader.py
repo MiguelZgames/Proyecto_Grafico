@@ -25,7 +25,9 @@ def load_data(file_path):
             'ggr_casino': 'casino_ggr',
             'player_id': 'jugador_id',
             'agente_username': 'nombre_usuario_agente',
-            'agente_id': 'id_agente'
+            'agente_id': 'id_agente',
+            'amount_bet_deportiva': 'total_apuesta_deportiva',
+            'amount_bet_casino': 'total_apuesta_casino'
         }
         
         # Check if required columns exist before renaming
@@ -57,6 +59,11 @@ def load_data(file_path):
             df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
             
         # Ensure calculo_ngr and calculo_comision are independent. Fallback removed.
+        
+        # Defensive numeric conversion for new bet amount columns
+        for c in ["total_apuesta_deportiva", "total_apuesta_casino"]:
+            if c in df.columns:
+                df[c] = pd.to_numeric(df[c], errors="coerce").fillna(0.0)
 
         # Fill ID and Username NaNs
         if 'nombre_usuario_agente' in df.columns:

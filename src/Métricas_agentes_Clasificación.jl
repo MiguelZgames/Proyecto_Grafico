@@ -156,7 +156,9 @@ function cargar_datos(archivo::String)
         "retiro" => "total_retiros",
         "ggr_deportiva" => "apuestas_deportivas_ggr",
         "ggr_casino" => "casino_ggr",
-        "comis_calculada" => "calculo_ngr"
+        "comis_calculada" => "calculo_ngr",
+        "deportiva_tickets" => "tickets_deportes",
+        "casino_tickets" => "tickets_casino"
     )
 
     println("✅ Columnas mapeadas correctamente")
@@ -169,7 +171,8 @@ function cargar_datos(archivo::String)
     # Convertir columnas numéricas
     columnas_numericas = [
         :num_depositos, :num_retiros, :total_depositos, :total_retiros,
-        :apuestas_deportivas_ggr, :casino_ggr, :calculo_ngr
+        :apuestas_deportivas_ggr, :casino_ggr, :calculo_ngr,
+        :tickets_deportes, :tickets_casino
     ]
 
     for col in columnas_numericas
@@ -188,9 +191,11 @@ end
 # ============================================================================
 
 """
-Calcula las 11 métricas para un agente específico
+Calcula las 11 métricas para un agente en el mes de evaluación específico.
+Métricas puntuales usan solo el mes de evaluación.
+Métricas históricas (Estabilidad, Tendencia, Crecimiento) usan todo el historial hasta ese mes.
 """
-function calcular_metricas_agente(df_agente::DataFrame, total_jugadores_global::Int)
+function calcular_metricas_agente(df_agente::DataFrame, total_jugadores_global::Int, mes_evaluacion)
     metricas = Dict{String,Float64}()
 
     # Validar que exista la columna 'creado'
@@ -217,20 +222,36 @@ function calcular_metricas_agente(df_agente::DataFrame, total_jugadores_global::
         :total_retiros => sum => :total_retiros,
         :apuestas_deportivas_ggr => sum => :apuestas_deportivas_ggr,
         :casino_ggr => sum => :casino_ggr,
+        :tickets_deportes => sum => :tickets_deportes,
+        :tickets_casino => sum => :tickets_casino,
         :jugador_id => (x -> length(unique(x))) => :jugador_id_unique
     )
 
-    total_ngr = sum(df_mensual.calculo_ngr)
-    total_depositos = sum(df_mensual.total_depositos)
-    total_num_depositos = sum(df_mensual.num_depositos)
-    total_ggr_deportes = sum(df_mensual.apuestas_deportivas_ggr)
-    total_ggr_casino = sum(df_mensual.casino_ggr)
+    # Ordenar por mes y filtrar hasta el mes de evaluación (historial)
+    sort!(df_mensual, :mes)
+    df_mensual = filter(row -> row.mes <= mes_evaluacion, df_mensual)
+
+    if nrow(df_mensual) == 0
+        return Dict(k => 0.0 for k in keys(PESOS_METRICAS)), DataFrame()
+    end
+
+    # Verificar que el agente tenga datos en el mes de evaluación
+    df_mes_eval = filter(row -> row.mes == mes_evaluacion, df_mensual)
+    if nrow(df_mes_eval) == 0
+        return Dict(k => 0.0 for k in keys(PESOS_METRICAS)), df_mensual
+    end
+
+    # --- TOTALES DEL MES DE EVALUACIÓN (métricas mensuales, no acumuladas) ---
+    total_ngr = df_mes_eval[1, :calculo_ngr]
+    total_depositos = df_mes_eval[1, :total_depositos]
+    total_num_depositos = df_mes_eval[1, :num_depositos]
+    total_ggr_deportes = df_mes_eval[1, :apuestas_deportivas_ggr]
+    total_ggr_casino = df_mes_eval[1, :casino_ggr]
     total_ggr = total_ggr_deportes + total_ggr_casino
 
-    # Calcular apuestas aproximadas
-    margen_estimado = 0.05
-    total_apuestas_deportes = total_ggr_deportes > 0 ? total_ggr_deportes / margen_estimado : 0.0
-    total_apuestas_casino = total_ggr_casino > 0 ? total_ggr_casino / margen_estimado : 0.0
+    # Tickets reales del mes (apuestas)
+    total_apuestas_deportes = df_mes_eval[1, :tickets_deportes]
+    total_apuestas_casino = df_mes_eval[1, :tickets_casino]
     total_apuestas = total_apuestas_deportes + total_apuestas_casino
 
     # 1. RENTABILIDAD DE COMISIÓN (12%)
@@ -256,8 +277,8 @@ function calcular_metricas_agente(df_agente::DataFrame, total_jugadores_global::
         metricas["rentabilidad"] = 0.0
     end
 
-    # 2. VOLUMEN DE NEGOCIO (15%)
-    total_transacciones = sum(df_mensual.num_depositos) + sum(df_mensual.num_retiros)
+    # 2. VOLUMEN DE NEGOCIO (15%) - Del mes de evaluación
+    total_transacciones = total_num_depositos + df_mes_eval[1, :num_retiros]
     if total_transacciones > 0
         volumen = log10(total_transacciones + 1) * 2.3
         metricas["volumen"] = min(10, max(0, volumen))
@@ -265,8 +286,9 @@ function calcular_metricas_agente(df_agente::DataFrame, total_jugadores_global::
         metricas["volumen"] = 0.0
     end
 
-    # 3. FIDELIDAD DE JUGADORES (15%)
-    jugadores_agente = length(unique(df_agente.jugador_id))
+    # 3. FIDELIDAD DE JUGADORES (15%) - Del mes de evaluación
+    df_agente_mes = filter(row -> row.mes == mes_evaluacion, df_agente)
+    jugadores_agente = length(unique(df_agente_mes.jugador_id))
     if total_jugadores_global > 0
         proporcion_jugadores = (jugadores_agente / total_jugadores_global) * 100
         metricas["fidelidad"] = min(10, proporcion_jugadores * 2.5)
@@ -275,30 +297,72 @@ function calcular_metricas_agente(df_agente::DataFrame, total_jugadores_global::
     end
 
     # 4. ESTABILIDAD FINANCIERA (12%)
+    # Combina: CV logarítmico de todo el historial (40%) + patrón últimos 3 meses (60%)
     comisiones_mensuales = df_mensual.calculo_ngr
-    if length(comisiones_mensuales) > 1
-        # Transformación logarítmica
+    total_meses = length(comisiones_mensuales)
+    
+    if total_meses == 0
+        metricas["estabilidad"] = 0.0
+    elseif total_meses == 1
+        # Agente nuevo con solo 1 mes = 3.0 puntos por defecto
+        metricas["estabilidad"] = 3.0
+    else
+        # --- COMPONENTE 1: CV logarítmico de todo el historial (40%) ---
         min_comision = minimum(comisiones_mensuales)
         comisiones_log = log.(comisiones_mensuales .+ abs(min_comision) .+ 1)
-
-        # CV logarítmico
         cv_log = calcular_coeficiente_variacion(comisiones_log)
         ef = 1 - cv_log
-
-        # Mapear EF a escala 0-10
+        
         if ef >= 0.8
-            metricas["estabilidad"] = 8.0 + ((ef - 0.8) / 0.2) * 2.0
+            score_cv = 8.0 + ((ef - 0.8) / 0.2) * 2.0
         elseif ef >= 0.6
-            metricas["estabilidad"] = 6.0 + ((ef - 0.6) / 0.2) * 2.0
+            score_cv = 6.0 + ((ef - 0.6) / 0.2) * 2.0
         elseif ef >= 0.4
-            metricas["estabilidad"] = 4.0 + ((ef - 0.4) / 0.2) * 2.0
+            score_cv = 4.0 + ((ef - 0.4) / 0.2) * 2.0
         elseif ef >= 0
-            metricas["estabilidad"] = (ef / 0.4) * 4.0
+            score_cv = (ef / 0.4) * 4.0
         else
-            metricas["estabilidad"] = 0.0
+            score_cv = 0.0
         end
-    else
-        metricas["estabilidad"] = 5.0
+        
+        # --- COMPONENTE 2: Patrón últimos 3 meses (60%) ---
+        n_meses_evaluar = min(3, total_meses)
+        ultimos_meses = comisiones_mensuales[end-n_meses_evaluar+1:end]
+        
+        mes_1 = ultimos_meses[end] > 0      # Último mes (más reciente)
+        mes_2 = n_meses_evaluar >= 2 ? ultimos_meses[end-1] > 0 : true
+        mes_3 = n_meses_evaluar >= 3 ? ultimos_meses[end-2] > 0 : true
+        
+        if n_meses_evaluar >= 3
+            if mes_1 && mes_2 && mes_3
+                score_reciente = 10.0  # 3 meses seguidos con comisión
+            elseif mes_1 && mes_2 && !mes_3
+                score_reciente = 8.0   # Falló hace 2 meses, pero lleva 2 bien
+            elseif mes_1 && !mes_2 && mes_3
+                score_reciente = 7.0   # Falló el mes anterior, se recuperó
+            elseif !mes_1 && mes_2 && mes_3
+                score_reciente = 6.0   # Solo falló el último mes
+            elseif mes_1 && !mes_2 && !mes_3
+                score_reciente = 5.0   # Falló 2 meses, se recuperó en el último
+            elseif !mes_1 && !mes_2 && mes_3
+                score_reciente = 3.0   # Falló los últimos 2 meses
+            else
+                score_reciente = 0.0   # Sin comisiones en los 3 meses
+            end
+        else  # 2 meses disponibles
+            if mes_1 && mes_2
+                score_reciente = 8.0
+            elseif mes_1 && !mes_2
+                score_reciente = 6.0
+            elseif !mes_1 && mes_2
+                score_reciente = 4.0
+            else
+                score_reciente = 0.0
+            end
+        end
+        
+        # --- COMBINAR: 40% historial + 60% reciente ---
+        metricas["estabilidad"] = score_cv * 0.4 + score_reciente * 0.6
     end
 
     # 5. CRECIMIENTO DE DEPÓSITOS (10%)
@@ -337,16 +401,16 @@ function calcular_metricas_agente(df_agente::DataFrame, total_jugadores_global::
     if total_ggr_casino > 0
         efic_casino = (total_num_depositos / total_ggr_casino) * 100
 
-        if efic_casino > 5.5
-            metricas["eficiencia_casino"] = 10.0
-        elseif efic_casino > 10
-            metricas["eficiencia_casino"] = 7.5
-        elseif efic_casino > 14
-            metricas["eficiencia_casino"] = 5.0
+        if efic_casino > 33
+            metricas["eficiencia_casino"] = 2.0
         elseif efic_casino > 20
             metricas["eficiencia_casino"] = 3.0
-        elseif efic_casino > 33
-            metricas["eficiencia_casino"] = 2.0
+        elseif efic_casino > 14
+            metricas["eficiencia_casino"] = 5.0
+        elseif efic_casino > 10
+            metricas["eficiencia_casino"] = 7.5
+        elseif efic_casino > 5.5
+            metricas["eficiencia_casino"] = 10.0
         else
             metricas["eficiencia_casino"] = max(0, 10 - (efic_casino / 10))
         end
@@ -358,16 +422,16 @@ function calcular_metricas_agente(df_agente::DataFrame, total_jugadores_global::
     if total_ggr_deportes > 0
         efic_deportes = (total_num_depositos / total_ggr_deportes) * 100
 
-        if efic_deportes > 5.5
-            metricas["eficiencia_deportes"] = 10.0
-        elseif efic_deportes > 10
-            metricas["eficiencia_deportes"] = 7.5
-        elseif efic_deportes > 14
-            metricas["eficiencia_deportes"] = 5.0
+        if efic_deportes > 33
+            metricas["eficiencia_deportes"] = 2.0
         elseif efic_deportes > 20
             metricas["eficiencia_deportes"] = 3.0
-        elseif efic_deportes > 33
-            metricas["eficiencia_deportes"] = 2.0
+        elseif efic_deportes > 14
+            metricas["eficiencia_deportes"] = 5.0
+        elseif efic_deportes > 10
+            metricas["eficiencia_deportes"] = 7.5
+        elseif efic_deportes > 5.5
+            metricas["eficiencia_deportes"] = 10.0
         else
             metricas["eficiencia_deportes"] = max(0, 10 - (efic_deportes / 10))
         end
@@ -469,20 +533,20 @@ function categorizar_agente(score::Float64)
         return "A++", "Excelencia alta - Top tier sobresaliente"
     elseif score >= 8.0
         return "A+", "Excelencia - Muy alto desempeño"
-    elseif score >= 7.0
+    elseif score >= 7.5
         return "B+++", "Consolidado superior - Buen track record"
-    elseif score >= 6.5
+    elseif score >= 7.0
         return "B++", "Consolidado alto - Desempeño sólido"
-    elseif score >= 6.0
+    elseif score >= 6.5
         return "B+", "Consolidado - Estable y confiable"
-    elseif score >= 5.0
+    elseif score >= 5.5
         return "C+++", "En desarrollo avanzado - Progreso visible"
-    elseif score >= 4.0
+    elseif score >= 4.5
         return "C++", "En desarrollo medio - Requiere mejoras"
-    elseif score >= 3.0
+    elseif score >= 3.5
         return "C+", "Principiante - Necesita atención"
     else
-        return "C", "Crítico - Intervención urgente"
+        return "C", "Base - Punto de partida"
     end
 end
 
@@ -792,7 +856,7 @@ end
 # ============================================================================
 
 """
-Calcula el crédito sugerido: C = P25 × f_s × f_v × f_t × f_volumen
+Calcula el crédito sugerido: C = (0.6×P25 + 0.4×Mediana) × f_s × f_v × f_t × f_volumen
 """
 function calcular_credito_sugerido(df_mensual::DataFrame, score::Float64, metricas::Dict{String,Float64})
     ngr_mensuales = df_mensual.calculo_ngr
@@ -821,8 +885,13 @@ function calcular_credito_sugerido(df_mensual::DataFrame, score::Float64, metric
         return 0.0, detalles_default
     end
 
-    # Percentil 25
+    # Percentil 25 y mediana
     p25 = calcular_percentil_25(ngr_validos)
+    mediana = median(ngr_validos)
+
+    # Base de crédito: mezcla de P25 (seguridad) y mediana (recompensa)
+    # 60% P25 + 40% mediana → más generoso con agentes de alta comisión
+    base_credito = p25 * 0.6 + mediana * 0.4
 
     # Factor de volatilidad con transformación logarítmica
     min_ngr = minimum(ngr_validos)
@@ -836,19 +905,21 @@ function calcular_credito_sugerido(df_mensual::DataFrame, score::Float64, metric
     tendencia = calcular_tendencia_lineal(ngr_validos)
     f_t, desc_tendencia = calcular_factor_tendencia(tendencia)
 
-    # Factor de score: f_s = 0.5 + 0.05 * ((S + E) / 2)
+    # Factor de score: f_s = 0.5 + 0.06 * ((S + E) / 2)
     S = score
     E = metricas["estabilidad"]
-    f_s_final = 0.5 + 0.05 * ((S + E) / 2)
+    f_s_final = 0.5 + 0.06 * ((S + E) / 2)
 
-    # Factor de volumen
+    # Factor de volumen - más generoso con comisiones altas
     comision_total = sum(ngr_validos)
-    if comision_total >= 50000
-        f_volumen = 1.5
+    if comision_total >= 80000
+        f_volumen = 2.0
+    elseif comision_total >= 50000
+        f_volumen = 1.7
     elseif comision_total >= 30000
-        f_volumen = 1.3
+        f_volumen = 1.4
     elseif comision_total >= 15000
-        f_volumen = 1.15
+        f_volumen = 1.2
     elseif comision_total >= 5000
         f_volumen = 1.0
     else
@@ -856,14 +927,13 @@ function calcular_credito_sugerido(df_mensual::DataFrame, score::Float64, metric
     end
 
     # Crédito base
-    credito = p25 * f_s_final * f_v * f_t * f_volumen
+    credito = base_credito * f_s_final * f_v * f_t * f_volumen
 
     # Límites de seguridad
-    if p25 < 100
+    if p25 < 50
         credito = 0.0
     else
-        mediana = median(ngr_validos)
-        limite_superior = 3 * mediana * f_volumen
+        limite_superior = 4 * mediana * f_volumen
         credito = min(credito, limite_superior)
     end
 
@@ -881,7 +951,7 @@ function calcular_credito_sugerido(df_mensual::DataFrame, score::Float64, metric
         "desc_tendencia" => desc_tendencia,
         "f_score" => f_s_final,
         "meses_historial" => length(ngr_validos),
-        "mediana" => median(ngr_validos)
+        "mediana" => mediana
     )
 
     return credito, detalles
@@ -902,15 +972,23 @@ function procesar_agentes(archivo_csv::String)
     # Cargar datos
     df = cargar_datos(archivo_csv)
 
-    # Total de jugadores únicos
-    total_jugadores_global = length(unique(df.jugador_id))
-    println("Total jugadores únicos en sistema: $total_jugadores_global")
+    # Determinar mes de evaluación (ultimo mes con datos)
+    meses_disponibles = unique(yearmonth.(df.creado))
+    mes_evaluacion = maximum(meses_disponibles)
+    fecha_eval = Date(mes_evaluacion[1], mes_evaluacion[2], 1)
+    println("\n📅 Mes de evaluación: $(Dates.monthname(fecha_eval)) $(mes_evaluacion[1])")
 
-    # Obtener lista de agentes únicos
-    agentes = unique(df.nombre_usuario_agente)
+    # Total de jugadores únicos del mes de evaluación
+    mask_mes = [yearmonth(d) == mes_evaluacion for d in df.creado]
+    df_mes = df[mask_mes, :]
+    total_jugadores_global = length(unique(df_mes.jugador_id))
+    println("Total jugadores únicos en el mes: $total_jugadores_global")
+
+    # Obtener agentes con actividad en el mes de evaluación
+    agentes = unique(df_mes.nombre_usuario_agente)
     total_agentes = length(agentes)
 
-    println("\n🔄 Procesando $total_agentes agentes...")
+    println("\n🔄 Procesando $total_agentes agentes con actividad en $(Dates.monthname(fecha_eval))...")
 
     resultados = []
 
@@ -919,12 +997,12 @@ function procesar_agentes(archivo_csv::String)
             println("Procesando $idx/$total_agentes...")
         end
 
-        # Filtrar datos del agente
+        # Filtrar TODOS los datos del agente (historial completo)
         df_agente = df[df.nombre_usuario_agente.==agente, :]
 
         try
-            # Calcular métricas
-            metricas, df_mensual = calcular_metricas_agente(df_agente, total_jugadores_global)
+            # Calcular métricas para el mes de evaluación
+            metricas, df_mensual = calcular_metricas_agente(df_agente, total_jugadores_global, mes_evaluacion)
 
             # Calcular score
             score = calcular_score_total(metricas)
@@ -995,6 +1073,77 @@ function mostrar_resumen(resultados::Vector)
             rpad(res["categoria"], 12) *
             "\$" * string(round(Int, res["credito_sugerido"]))
         )
+    end
+
+    # Detalle de métricas por agente (Top 10)
+    println("\n" * "="^80)
+    println("DETALLE DE MÉTRICAS POR AGENTE (TOP 10)")
+    println("="^80)
+    
+    for (i, res) in enumerate(resultados[1:min(10, length(resultados))])
+        metricas = res["metricas"]
+        println("\n📋 #$i - $(res["agente"]) | Score: $(res["score"]) | Categoría: $(res["categoria"]) | Crédito: \$$(round(Int, res["credito_sugerido"]))")
+        println("-"^80)
+        println("  Rentabilidad (12%):    $(round(metricas["rentabilidad"], digits=2))")
+        println("  Volumen (15%):         $(round(metricas["volumen"], digits=2))")
+        println("  Fidelidad (15%):       $(round(metricas["fidelidad"], digits=2))")
+        println("  Estabilidad (12%):     $(round(metricas["estabilidad"], digits=2))")
+        println("  Crecimiento (10%):     $(round(metricas["crecimiento"], digits=2))")
+        println("  Efic. Casino (8%):     $(round(metricas["eficiencia_casino"], digits=2))")
+        println("  Efic. Deportes (8%):   $(round(metricas["eficiencia_deportes"], digits=2))")
+        println("  Conversión (11%):      $(round(metricas["eficiencia_conversion"], digits=2))")
+        println("  Tendencia (4%):        $(round(metricas["tendencia"], digits=2))")
+        println("  Diversificación (3%):  $(round(metricas["diversificacion"], digits=2))")
+        println("  Calidad (2%):          $(round(metricas["calidad_jugadores"], digits=2))")
+    end
+    
+    # Análisis de similitud con el líder del mes
+    if length(resultados) >= 2
+        lider = resultados[1]
+        lider_metricas = lider["metricas"]
+        lider_score = lider["score"]
+
+        println("\n" * "="^80)
+        println("ANÁLISIS DE SIMILITUD CON EL LÍDER: $(lider["agente"]) (Score: $lider_score)")
+        println("="^80)
+
+        nombres_metricas = [
+            ("rentabilidad", "Rentabilidad"),
+            ("volumen", "Volumen"),
+            ("fidelidad", "Fidelidad"),
+            ("estabilidad", "Estabilidad"),
+            ("crecimiento", "Crecimiento"),
+            ("eficiencia_casino", "Efic. Casino"),
+            ("eficiencia_deportes", "Efic. Deportes"),
+            ("eficiencia_conversion", "Conversión"),
+            ("tendencia", "Tendencia"),
+            ("diversificacion", "Diversificación"),
+            ("calidad_jugadores", "Calidad")
+        ]
+
+        for (i, res) in enumerate(resultados[2:min(10, length(resultados))])
+            metricas = res["metricas"]
+            sim_score = lider_score > 0 ? round(res["score"] / lider_score * 100, digits=1) : 0.0
+
+            println("\n📊 #$(i+1) - $(res["agente"]) | Score: $(res["score"]) | Similitud global: $(sim_score)%")
+            println("-"^80)
+
+            for (key, nombre) in nombres_metricas
+                val_agente = round(metricas[key], digits=2)
+                val_lider = round(lider_metricas[key], digits=2)
+                if val_lider > 0
+                    sim = round(min(100.0, val_agente / val_lider * 100), digits=1)
+                elseif val_agente == 0
+                    sim = 100.0
+                else
+                    sim = 0.0
+                end
+                # Barra visual de similitud
+                barra_len = round(Int, sim / 5)
+                barra = "█"^barra_len * "░"^(20 - barra_len)
+                println("  $(rpad(nombre, 18)) $(rpad(string(val_agente), 6))/ $(rpad(string(val_lider), 6)) $(barra) $(sim)%")
+            end
+        end
     end
 
     # Estadísticas generales

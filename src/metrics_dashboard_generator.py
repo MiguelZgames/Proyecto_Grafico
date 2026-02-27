@@ -64,7 +64,7 @@ def load_and_validate_data(csv_path="Data/reporte_detallado_jugadores_final.csv"
         df_ag = df[df['id_agente'] == ag_id]
         if len(df_ag) == 0: continue
             
-        metricas_snapshot, df_mensual_orig, df_mensual_mets = calcular_metricas_agente_con_mensual(df_ag, total_jugadores_global)
+        metricas_snapshot, df_mensual_orig, df_mensual_mets = calcular_metricas_agente_con_mensual(df_ag, total_jugadores_global, monthly_mode="rolling_3m")
         df_mensual = pd.merge(df_mensual_orig, df_mensual_mets, on='mes', how='left')
         
         # Aseguramos que existan, pero SIN fallback entre ellas
@@ -73,8 +73,11 @@ def load_and_validate_data(csv_path="Data/reporte_detallado_jugadores_final.csv"
         if 'calculo_ngr' not in df_mensual.columns:
             df_mensual['calculo_ngr'] = 0.0
             
-        if 'jugador_id' in df_mensual.columns and 'active_players' not in df_mensual.columns:
-            df_mensual['active_players'] = df_mensual['jugador_id']
+        if 'active_players' not in df_mensual.columns:
+            if 'jugador_id_unique' in df_mensual.columns:
+                df_mensual['active_players'] = df_mensual['jugador_id_unique']
+            elif 'jugador_id' in df_mensual.columns:
+                df_mensual['active_players'] = df_mensual['jugador_id']
         
         if df_mensual.empty: continue
             
@@ -94,10 +97,20 @@ def load_and_validate_data(csv_path="Data/reporte_detallado_jugadores_final.csv"
         else:
              df_mensual['global_players'] = total_jugadores_global
              
+        # --- NEW CONTEXT METRIC: EFICIENCIA JUEGO ---
+        if 'total_apuesta_deportiva' in df_mensual.columns and 'total_apuesta_casino' in df_mensual.columns and 'total_depositos' in df_mensual.columns:
+            # Save the sum explicitly in the dataframe
+            df_mensual['total_apuesta_total'] = df_mensual['total_apuesta_deportiva'].fillna(0) + df_mensual['total_apuesta_casino'].fillna(0)
+            df_mensual['eficiencia_juego'] = np.where(df_mensual['total_depositos'] > 0, 
+                ((df_mensual['total_apuesta_total'] / df_mensual['total_depositos']) - 1) * 100, 
+                0.0)
+            df_mensual['eficiencia_juego'] = df_mensual['eficiencia_juego'].fillna(0.0).replace([np.inf, -np.inf], 0.0)
+        # --------------------------------------------
+
         # Only keep necessary columns to optimize payload size
         cols_to_keep = ['agente_id', 'agente_name', 'month_str'] + core_metrics
-        # Add basic volume metrics just in case they want context
-        context_cols = ['total_depositos', 'calculo_ngr', 'calculo_comision', 'score_global', 'active_players', 'num_depositos', 'num_retiros', 'global_players', 'casino_ggr', 'apuestas_deportivas_ggr']
+        # Add basic volume metrics just in case they want context (MUST INCLUDE 'total_apuesta_total')
+        context_cols = ['total_depositos', 'calculo_ngr', 'calculo_comision', 'score_global', 'active_players', 'num_depositos', 'num_retiros', 'global_players', 'casino_ggr', 'apuestas_deportivas_ggr', 'eficiencia_juego', 'total_apuesta_total']
         for c in context_cols:
             if c in df_mensual.columns:
                 cols_to_keep.append(c)
@@ -152,7 +165,8 @@ def generate_metrics_dashboard(monthly_dict, out_path="reports/metrics_historic_
         'eficiencia_conversion': {'title': 'Eficiencia de Conversión (GGR / Depósitos %)', 'color': '#2dd4bf'},
         'tendencia': {'title': 'Tendencia Histórica (Pendiente Regresión)', 'color': '#6366f1'},
         'diversificacion': {'title': 'Diversificación de Productos (1 - HHI Casino vs Deportes)', 'color': '#d946ef'},
-        'calidad_jugadores': {'title': 'Calidad de Jugadores (Apuesta Promedio por Jugador)', 'color': '#14b8a6'}
+        'calidad_jugadores': {'title': 'Calidad de Jugadores (Apuesta Promedio por Jugador)', 'color': '#14b8a6'},
+        'eficiencia_juego': {'title': 'Eficiencia de Juego (Turnover vs Depósitos %)', 'color': '#6366f1'}
     }
     config_json = json.dumps(chart_config)
     
@@ -422,13 +436,14 @@ def generate_metrics_dashboard(monthly_dict, out_path="reports/metrics_historic_
         <span id="check-vol">Volumen ✅</span>
         <span id="check-fid">Fidelidad ✅</span>
         <span id="check-est">Estabilidad ✅</span>
-        <span id="check-cre">Crecimiento ✅</span>
+        <!-- <span id="check-cre">Crecimiento ✅</span> -->
         <span id="check-cas">Efic. Casino ✅</span>
         <span id="check-dep">Efic. Deportes ✅</span>
         <span id="check-conv">Conversión ✅</span>
+        <span id="check-jue">Efic. Juego ✅</span>
         <span id="check-ten">Tendencia ✅</span>
         <span id="check-div">Diversificación ✅</span>
-        <span id="check-cal">Calidad ✅</span>
+        <!-- <span id="check-cal">Calidad ✅</span> -->
         <div style="margin-left:auto; font-size:12px; color:#64748b;">✅ Las 11 métricas verificadas y graficadas exitosamente.</div>
     </div>
 
@@ -442,31 +457,224 @@ def generate_metrics_dashboard(monthly_dict, out_path="reports/metrics_historic_
     const monthlyData = {{ monthly_json | safe }};
     const agentsList = {{ agents_list_json | safe }};
     const chartConfig = {{ config_json | safe }};
-    const metricKeys = Object.keys(chartConfig); // exactly 11
+    const HIDDEN_METRICS = new Set(['crecimiento', 'calidad_jugadores']);
+    const metricKeys = Object.keys(chartConfig || {}).filter(k => !HIDDEN_METRICS.has(k));
 
     const metricInfo = {
-        'rentabilidad': { obj: 'Mide la eficiencia y margen real del negocio (NGR vs volumen ingresado).', calc: 'NGR / Depósitos * 100', int: '> 10% Fuerte | 5-10% Aceptable | < 5% Débil | < 0% Pérdida', watch: 'Caídas bruscas del margen o altos volúmenes que no generan NGR.' },
-        'volumen': { obj: 'Mide la escala transaccional del agente.', calc: 'Log10(Total Depósitos)', int: 'Escala logarítmica (10 = $10B, 6 = $1M, 3 = $1K).', watch: 'Caídas drásticas indicando inactividad de jugadores top.' },
-        'fidelidad': { obj: 'Mide el peso del agente sobre el total de la base activa global.', calc: 'Jugadores Activos del Agente / Total Jugadores Globales', int: 'Porcentaje de mercado interno.', watch: 'Pérdida de porcentaje constante mes a mes.' },
-        'estabilidad': { obj: 'Evalúa la volatilidad del NGR histórico.', calc: '1 - Coeficiente de Variación de NGR', int: 'Higher = more stable; 6+ is stable; 4–6 moderate; <4 risk.', watch: 'Caídas indican flujos de caja impredecibles.' },
+        'rentabilidad': { 
+            custom: `
+                        <div class="popover-section">
+                            <div class="popover-label">OBJETIVO</div>
+                            <div class="popover-text">Evalúa la rentabilidad del negocio comparando NGR generado vs depósitos del mes.</div>
+                        </div>
+                        <div class="popover-section">
+                            <div class="popover-label">CÁLCULO</div>
+                            <div class="popover-text">Margen Real (%) = (NGR / Depósitos) &times; 100</div>
+                        </div>
+                        <div class="popover-section">
+                            <div class="popover-label">CÓMO LEER EL GRÁFICO</div>
+                            <div class="popover-text">
+                                - Barras: Depósitos ($) por mes<br>
+                                - Línea negra: Margen Real (%)<br>
+                                - Línea punteada: Score (0&ndash;10)<br>
+                                - Líneas guía: 0%, 5%, 10%, 20%
+                            </div>
+                        </div>
+                        <div class="popover-section">
+                            <div class="popover-label">UMBRAL RÁPIDO</div>
+                            <div class="popover-text">&gt; 10% Fuerte | 5&ndash;10% Aceptable | &lt; 5% Débil | &lt; 0% Pérdida</div>
+                        </div>
+                        <div class="popover-section">
+                            <div class="popover-label">SEÑALES A VIGILAR</div>
+                            <div class="popover-text">
+                                - Caídas bruscas del margen (&Delta; pp negativo)<br>
+                                - Depósitos altos con margen bajo (volumen sin NGR)<br>
+                                - Depósitos muy bajos: el % puede verse inflado (revisar NGR y $)
+                            </div>
+                        </div>
+            `
+        },
+        'volumen': { 
+            custom: `
+                        <div class="popover-section">
+                            <div class="popover-label">OBJETIVO</div>
+                            <div class="popover-text">Mide la escala de actividad del agente en número de transacciones mensuales (engagement operativo).</div>
+                        </div>
+                        <div class="popover-section">
+                            <div class="popover-label">CÁLCULO</div>
+                            <div class="popover-text">
+                                TXs = (# Depósitos + # Retiros)<br>
+                                Score = log10(TXs + 1) &times; 2.3
+                            </div>
+                        </div>
+                        <div class="popover-section">
+                            <div class="popover-label">CÓMO LEER EL GRÁFICO</div>
+                            <div class="popover-text">
+                                - Palitos verdes: Total TXs por mes<br>
+                                - Línea punteada: Score (0&ndash;10) (escala logarítmica)<br>
+                                - Encabezado: TXs del último mes + &Delta; vs mes anterior
+                            </div>
+                        </div>
+                        <div class="popover-section">
+                            <div class="popover-label">INTERPRETACIÓN</div>
+                            <div class="popover-text">
+                                Escala logarítmica: cada &times;10 en TXs suma ~2.3 puntos.<br>
+                                Referencia: 100 TXs &approx; 4.6 | 1,000 &approx; 6.9 | 10,000 &approx; 9.2
+                            </div>
+                        </div>
+                        <div class="popover-section">
+                            <div class="popover-label">SEÑALES A VIGILAR</div>
+                            <div class="popover-text">
+                                - Caída crítica: descenso fuerte de TXs vs mes anterior (riesgo de inactividad)<br>
+                                - Pico inusual: salto fuerte (campañas/reactivación o outlier)<br>
+                                - La escala log suaviza cambios: revisar &Delta;% además del score.
+                            </div>
+                        </div>
+            `
+        },
+        'fidelidad': { 
+            custom: `
+                        <div class="popover-section">
+                            <div class="popover-label">OBJETIVO</div>
+                            <div class="popover-text">Mide la participación mensual de jugadores de la agencia dentro del total global (presencia / share).</div>
+                        </div>
+                        <div class="popover-section">
+                            <div class="popover-label">CÁLCULO</div>
+                            <div class="popover-text">
+                                Share (%) = (Jugadores Propios del mes / Jugadores Globales) &times; 100<br>
+                                Score (0&ndash;10) = min(10, Share &times; 2.5)
+                            </div>
+                        </div>
+                        <div class="popover-section">
+                            <div class="popover-label">CÓMO LEER EL GRÁFICO</div>
+                            <div class="popover-text">
+                                - Línea morada: Share (%) mensual<br>
+                                - Marcadores: un punto por mes<br>
+                                - Encabezado: Share actual + &Delta; en pp vs mes anterior
+                            </div>
+                        </div>
+                        <div class="popover-section">
+                            <div class="popover-label">INTERPRETACIÓN RÁPIDA</div>
+                            <div class="popover-text">
+                                - 4.0% Share &rArr; Score 10 (tope)<br>
+                                - 2.0% &rArr; Score 5<br>
+                                - 1.0% &rArr; Score 2.5<br>
+                                Más share = más fidelidad/participación.
+                            </div>
+                        </div>
+                        <div class="popover-section">
+                            <div class="popover-label">QUÉ OBSERVAR</div>
+                            <div class="popover-text">
+                                - Share sube + Propios suben &rArr; crecimiento real<br>
+                                - Share sube pero Propios no crecen &rArr; revisar Global (efecto denominador)<br>
+                                - Caídas de Share (&Delta; pp negativo) &rArr; pérdida de participación
+                            </div>
+                        </div>
+            `
+        },
+        'estabilidad': { 
+            custom: `
+                        <div class="popover-section">
+                            <div class="popover-label">OBJETIVO</div>
+                            <div class="popover-text">Mide qué tan predecible y consistente es el NGR mensual del agente (baja volatilidad + continuidad reciente).</div>
+                        </div>
+                        <div class="popover-section">
+                            <div class="popover-label">CÁLCULO</div>
+                            <div class="popover-text">
+                                Se combinan 2 componentes:<br>
+                                - Histórico (40%): CV logarítmico del NGR (menor CV = más estable)<br>
+                                &nbsp;&nbsp;ef = 1 &minus; CV_log  &rarr; mayor ef = mayor estabilidad<br>
+                                - Reciente (60%): patrón de los últimos 2&ndash;3 meses (racha de NGR &gt; 0)<br>
+                                Score final = 0.4 &times; score_histórico + 0.6 &times; score_reciente
+                            </div>
+                        </div>
+                        <div class="popover-section">
+                            <div class="popover-label">CÓMO LEER EL GRÁFICO</div>
+                            <div class="popover-text">
+                                - Barra: score actual (0&ndash;10)<br>
+                                - Línea punteada: Objetivo 6.0 (umbral)<br>
+                                - Dots: score mensual<br>
+                                - Panel derecho: score + estado + brecha vs objetivo
+                            </div>
+                        </div>
+                        <div class="popover-section">
+                            <div class="popover-label">INTERPRETACIÓN</div>
+                            <div class="popover-text">
+                                &gt; 6.0 Estable | 4&ndash;6 Moderado | &lt; 4 Inestable<br>
+                                Score alto = NGR con poca variación + meses recientes positivos.
+                            </div>
+                        </div>
+                        <div class="popover-section">
+                            <div class="popover-label">QUÉ OBSERVAR</div>
+                            <div class="popover-text">
+                                - Caídas bajo 6: mayor volatilidad o meses recientes sin NGR<br>
+                                - Consistencia de dots: estabilidad sostenida<br>
+                                - El score puede bajar aunque el NGR suba si se vuelve más irregular.
+                            </div>
+                        </div>
+            `
+        },
         'crecimiento': { obj: 'Ritmo de expansión de volumen de depósitos.', calc: '(Depósitos Mes Actual / Depósitos Mes Anterior) - 1', int: 'Valores > 0% indican crecimiento. Consistencia es mejor que picos asilados.', watch: 'Meses continuos en negativo.' },
-        'eficiencia_casino': { obj: 'Qué tanto depósito genera 1 dólar de GGR en Casino.', calc: 'Depósitos / GGR Casino', int: 'Valores bajos = Casino altamente rentable. Valores altos = Jugadores depositan pero no pierden.', watch: 'Picos anormalmente altos.' },
+        'eficiencia_casino': { 
+            custom: `
+                        <div class="popover-section">
+                            <div class="popover-label">OBJETIVO</div>
+                            <div class="popover-text">Mide qué tan eficiente es la agencia generando GGR Casino a partir de la actividad de depósitos.</div>
+                        </div>
+                        <div class="popover-section">
+                            <div class="popover-label">CÁLCULO (MODELO)</div>
+                            <div class="popover-text">
+                                Eficiencia = (# Depósitos / GGR Casino) &times; 100<br>
+                                Menor ratio = mejor eficiencia (más GGR por menos depósitos).
+                            </div>
+                        </div>
+                        <div class="popover-section">
+                            <div class="popover-label">CÓMO LEER EL GRÁFICO</div>
+                            <div class="popover-text">
+                                - Barra: score de eficiencia (0&ndash;10)<br>
+                                - Línea punteada: Objetivo 7.0<br>
+                                - Dots: score mensual<br>
+                                - Panel derecho: score + estado + brecha vs objetivo
+                            </div>
+                        </div>
+                        <div class="popover-section">
+                            <div class="popover-label">INTERPRETACIÓN RÁPIDA</div>
+                            <div class="popover-text">
+                                &gt; 33 &rArr; ~2 (muy ineficiente)<br>
+                                20&ndash;33 &rArr; ~3<br>
+                                14&ndash;20 &rArr; ~5<br>
+                                10&ndash;14 &rArr; ~7.5<br>
+                                5.5&ndash;10 &rArr; ~10 (muy eficiente)
+                            </div>
+                        </div>
+                        <div class="popover-section">
+                            <div class="popover-label">QUÉ OBSERVAR</div>
+                            <div class="popover-text">
+                                - Subidas del ratio (peor): más depósitos para el mismo GGR<br>
+                                - Ratio alto con GGR bajo: baja conversión / mix desfavorable<br>
+                                - Meses con GGR=0: score = 0 (no evaluable)<br><br>
+                                <i>Nota: si el tooltip muestra Depósitos($)/GGR es complementario; el score usa el ratio del modelo.</i>
+                            </div>
+                        </div>
+            `
+        },
         'eficiencia_deportes': { obj: 'Qué tanto depósito genera 1 dólar de GGR en Deportes.', calc: 'Depósitos / GGR Deportes', int: 'Similar a casino, pero sujeto a estacionalidad deportiva y varianza.', watch: 'Margen deportivo consistentemente negativo (Arbitraje/Fraude).' },
         'eficiencia_conversion': { obj: 'Tasa base bruta de conversión de depósitos a pérdidas del jugador (GGR).', calc: '(GGR Total / Depósitos) * 100', int: 'No contempla bonos ni costos. Solo retención bruta directa.', watch: 'Caída de la conversión combinada con alza de depósitos (bonus abuse).' },
         'tendencia': { obj: 'Dirección general del agente a largo plazo (Score).', calc: 'Pendiente de regresión lineal de los últimos 6 meses.', int: 'Positivo = Agente escalando. Negativo = En declive.', watch: 'Cambio de tendencia de positivo a negativo sostenido.' },
         'diversificacion': { obj: 'Mide si el agente depende de un solo producto.', calc: '1 - Índice HHI (Casino vs Deportes)', int: '10 = Perfectamente balanceado (50/50). 0 = 100% concentrado en un producto.', watch: 'Riesgo estructural por alta dependencia deportiva (varianza alta).' },
-        'calidad_jugadores': { obj: 'Valor transaccional promedio por jugador activo.', calc: 'Total Depósitos / Jugadores Activos', int: 'Mide si son VIPs o jugadores casuales (retail).', watch: 'Aumento de jugadores con colapso de calidad (tráfico de baja calidad).' }
+        'calidad_jugadores': { obj: 'Valor transaccional promedio por jugador activo.', calc: 'Total Depósitos / Jugadores Activos', int: 'Mide si son VIPs o jugadores casuales (retail).', watch: 'Aumento de jugadores con colapso de calidad (tráfico de baja calidad).' },
+        'eficiencia_juego': { obj: 'Mide el volumen de juego generado en relación al capital depositado.', calc: '((Apuestas Totales / Depósitos) - 1) * 100' }
     };
 
     function buildInfoIcon(mKey) {
         const info = metricInfo[mKey];
         if (!info) return '';
-        return `
-            <div style="display: flex; gap: 8px; align-items: center;">
-                <button class="info-button" onclick="resetChart('${mKey}')" title="Resetear Vista" aria-label="Reset View">↺</button>
-                <div class="info-wrapper">
-                    <button class="info-button" aria-label="Información">i</button>
-                    <div class="info-popover">
+        
+        let popoverContent = '';
+        if (info.custom) {
+            popoverContent = info.custom;
+        } else {
+            popoverContent = `
                         <div class="popover-section">
                             <div class="popover-label">OBJETIVO</div>
                             <div class="popover-text">${info.obj}</div>
@@ -483,6 +691,16 @@ def generate_metrics_dashboard(monthly_dict, out_path="reports/metrics_historic_
                             <div class="popover-label">QUÉ OBSERVAR</div>
                             <div class="popover-text">${info.watch}</div>
                         </div>
+            `;
+        }
+
+        return `
+            <div style="display: flex; gap: 8px; align-items: center;">
+                <button class="info-button" onclick="resetChart('${mKey}')" title="Resetear Vista" aria-label="Reset View">↺</button>
+                <div class="info-wrapper">
+                    <button class="info-button" aria-label="Información">i</button>
+                    <div class="info-popover">
+${popoverContent}
                     </div>
                 </div>
             </div>
@@ -2176,6 +2394,123 @@ def generate_metrics_dashboard(monthly_dict, out_path="reports/metrics_historic_
                     name: 'Score', marker: { color: config.color, cornerradius: 4 },
                     hovertemplate: '%{customdata}<extra></extra>'
                 });
+            } else if (m === 'eficiencia_juego') {
+                // ═══════════════════════════════════════════════════════════
+                //  EFICIENCIA DE JUEGO (Turnover vs Depósitos) - BAR CHART
+                // ═══════════════════════════════════════════════════════════
+                const hover_texts = [];
+                const deps = series.map(d => d.total_depositos || 0);
+                const ap_total = series.map(d => d.total_apuesta_total || 0); 
+                const margins = y_vals;
+                
+                const bar_colors = [];
+                let last_var_pp = 0;
+
+                for (let i = 0; i < series.length; i++) {
+                    const s = margins[i];
+                    const prev_s = i > 0 ? margins[i-1] : null;
+
+                    let is_critical = false;
+                    let has_event = false;
+                    let evento = null;
+                    let var_pp = null;
+
+                    if (prev_s !== null) {
+                        var_pp = s - prev_s;
+                        if (i === series.length - 1) last_var_pp = var_pp;
+
+                        // Thresholds for anomalies in Turnover Efficiency
+                        if (var_pp <= -20) {
+                            is_critical = true;
+                            has_event = true;
+                            evento = "⚠ Caída crítica";
+                        } else if (var_pp >= 30) {
+                            has_event = true;
+                            evento = "⚠ Pico inusual";
+                        }
+                    }
+
+                    // Red color for negative efficiency, config.color for positive
+                    bar_colors.push(s < 0 ? 'rgba(239, 68, 68, 0.7)' : hexToRgba(config.color, 0.8));
+
+                    const real_data = {
+                        "Depósitos": formatMoney(deps[i]),
+                        "Apuestas Totales": formatMoney(ap_total[i]),
+                        "Eficiencia %": formatPct(s)
+                    };
+                    
+                    const change_data = {};
+                    if (var_pp !== null) {
+                        change_data["Δ Eficiencia"] = (var_pp > 0 ? '+' : '') + formatPP(var_pp);
+                    }
+                    if (has_event && evento) change_data["Evento"] = evento;
+                    
+                    // Passing 0 as score since this is purely a contextual metric
+                    hover_texts.push(buildTooltipHTML(formatted_x[i], real_data, change_data, 0));
+                }
+
+                traces.push({
+                    x: x_vals, 
+                    y: margins, 
+                    customdata: hover_texts, 
+                    type: 'bar', 
+                    name: 'Eficiencia %', 
+                    marker: { color: bar_colors, cornerradius: 4 },
+                    text: margins.map(v => v.toFixed(1) + '%'),
+                    textposition: 'outside',
+                    textfont: { size: 10, color: '#475569', family: 'Inter', weight: 600 },
+                    cliponaxis: false,
+                    hovertemplate: '%{customdata}<extra></extra>'
+                });
+
+                // Calculate Momentum for Annotations
+                let momentum = "→ Estable";
+                let mom_color = "#64748b";
+                if (margins.length >= 2) {
+                    const lm = margins[margins.length-1] || 0;
+                    const pm = margins[margins.length-2] || 0;
+                    if (lm - pm >= 10) { momentum = "▲ Mejorando"; mom_color = "#10b981"; }
+                    else if (lm - pm <= -10) { momentum = "▼ Empeorando"; mom_color = "#ef4444"; }
+                }
+
+                const last_s = margins[margins.length - 1] || 0;
+                const delta_color = last_var_pp >= 0 ? '#10b981' : '#ef4444';
+                const delta_arrow = last_var_pp >= 0 ? '▲' : '▼';
+                const delta_str = (last_var_pp > 0 ? '+' : '') + last_var_pp.toFixed(2);
+                
+                let delta_pp_text = '';
+                if (margins.length >= 2) {
+                    delta_pp_text = `<span style="color:${delta_color}; font-size:11px; font-weight:600;">${delta_arrow} ${delta_str} pp</span><br>`;
+                } else {
+                    delta_pp_text = `<span style="color:#64748b; font-size:11px; font-weight:600;">Δ: N/A</span><br>`;
+                }
+
+                layout.annotations = [
+                    {
+                        x: 0, y: 1.13, xref: 'paper', yref: 'paper',
+                        xanchor: 'left', yanchor: 'top',
+                        text: `<b><span style="color:${mom_color};">${momentum}</span></b>`,
+                        showarrow: false,
+                        font: {size: 12, family: 'Inter'}
+                    },
+                    {
+                        x: 1, y: 1.15, xref: 'paper', yref: 'paper',
+                        xanchor: 'right', yanchor: 'top',
+                        text: `<b><span style="font-size:14px;color:#0f172a;">${last_s.toFixed(2)}%</span></b>  ` + delta_pp_text,
+                        showarrow: false,
+                        align: 'right'
+                    }
+                ];
+
+                layout.margin = { t: 50, b: 60, l: 60, r: 30 }; // Extra top margin for annotations
+                layout.yaxis = { 
+                    showline: true, linewidth: 1.5, linecolor: '#cbd5e1', 
+                    ticks: 'outside', tickcolor: '#cbd5e1', ticklen: 5,
+                    showgrid: true, gridcolor: 'rgba(241, 245, 249, 0.6)', zeroline: true, zerolinecolor: '#cbd5e1', 
+                    tickfont: { size: 10, color: '#475569', family: 'Inter' },
+                    ticksuffix: '%',
+                    autorange: true 
+                };
             }
             
             const pConfig = {
