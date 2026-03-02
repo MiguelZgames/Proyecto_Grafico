@@ -24,10 +24,16 @@ def run_server():
     while True:
         try:
             with socketserver.TCPServer(("", port), Handler) as httpd:
-                url = f"http://localhost:{port}/dashboard.html"
-                print(f"Iniciando servidor en {url}")
+                url_main = f"http://localhost:{port}/dashboard.html"
+                url_historic = f"http://localhost:{port}/metrics_historic_dashboard.html"
+                
+                print(f"Iniciando servidor local en el puerto {port}")
                 print("Presiona Ctrl+C para detener el servidor.")
-                webbrowser.open(url)
+                
+                # Abrir ambos reportes en pestañas separadas
+                webbrowser.open(url_main)
+                webbrowser.open(url_historic)
+                
                 httpd.serve_forever()
                 break
         except OSError:

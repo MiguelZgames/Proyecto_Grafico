@@ -13,6 +13,7 @@ from logic_analytics import (
     categorizar_agente, calcular_credito_sugerido,
     predecir_ggr
 )
+from metrics_dashboard_generator import load_and_validate_data, generate_metrics_dashboard
 
 def main():
     # New CSV Input
@@ -133,6 +134,13 @@ def main():
         # Pass new DFs to report generator
         generate_html_report(df_agents, df_monthly, output_file)
         print(f"Report generated at {output_file}")
+        
+        # Add generation of the Historic Metrics Dashboard
+        print("\nGenerating Historical Metrics Dashboard...")
+        historic_out_file = os.path.join(os.path.dirname(output_file), "metrics_historic_dashboard.html")
+        dict_data, _ = load_and_validate_data(input_file)
+        generate_metrics_dashboard(dict_data, out_path=historic_out_file)
+        
     except Exception as e:
         print(f"Error generating report: {e}")
         import traceback

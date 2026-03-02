@@ -59,7 +59,48 @@ def load_and_validate_data(csv_path="Data/reporte_detallado_jugadores_final.csv"
         agent_names = df.groupby('id_agente')['nombre_usuario_agente'].first().to_dict()
     elif 'agente_username' in df.columns:
         agent_names = df.groupby('id_agente')['agente_username'].first().to_dict()
-    
+        
+    # === 1. CALCULAR VISTA GLOBAL (TODAS LAS AGENCIAS) ===
+    print("Calculando métricas históricas GLOBALES...")
+    try:
+        _, df_mensual_orig_g, df_mensual_mets_g = calcular_metricas_agente_con_mensual(df, total_jugadores_global, monthly_mode="rolling_3m")
+        df_mensual_g = pd.merge(df_mensual_orig_g, df_mensual_mets_g, on='mes', how='left')
+        
+        if 'calculo_comision' not in df_mensual_g.columns: df_mensual_g['calculo_comision'] = 0.0
+        if 'calculo_ngr' not in df_mensual_g.columns: df_mensual_g['calculo_ngr'] = 0.0
+        
+        if 'active_players' not in df_mensual_g.columns:
+            if 'jugador_id_unique' in df_mensual_g.columns: df_mensual_g['active_players'] = df_mensual_g['jugador_id_unique']
+            elif 'jugador_id' in df_mensual_g.columns: df_mensual_g['active_players'] = df_mensual_g['jugador_id']
+            
+        df_mensual_g['agente_id'] = "GLOBAL"
+        df_mensual_g['agente_name'] = "🌟 VISTA GLOBAL (Todas las Agencias)"
+        
+        if 'mes' in df_mensual_g.columns:
+            df_mensual_g['month_str'] = df_mensual_g['mes'].astype(str)
+            df_mensual_g['global_players'] = df_mensual_g['mes'].map(global_monthly_players).fillna(total_jugadores_global)
+        else:
+            df_mensual_g['global_players'] = total_jugadores_global
+            
+        if 'total_apuesta_deportiva' in df_mensual_g.columns and 'total_apuesta_casino' in df_mensual_g.columns and 'total_depositos' in df_mensual_g.columns:
+            df_mensual_g['total_apuesta_total'] = df_mensual_g['total_apuesta_deportiva'].fillna(0) + df_mensual_g['total_apuesta_casino'].fillna(0)
+            df_mensual_g['eficiencia_juego'] = np.where(df_mensual_g['total_depositos'] > 0, 
+                ((df_mensual_g['total_apuesta_total'] / df_mensual_g['total_depositos']) - 1) * 100, 
+                0.0)
+            df_mensual_g['eficiencia_juego'] = df_mensual_g['eficiencia_juego'].fillna(0.0).replace([np.inf, -np.inf], 0.0)
+
+        cols_to_keep_g = ['agente_id', 'agente_name', 'month_str'] + core_metrics
+        context_cols_g = ['total_depositos', 'calculo_ngr', 'calculo_comision', 'score_global', 'active_players', 'num_depositos', 'num_retiros', 'global_players', 'casino_ggr', 'apuestas_deportivas_ggr', 'eficiencia_juego', 'total_apuesta_total']
+        for c in context_cols_g:
+            if c in df_mensual_g.columns:
+                cols_to_keep_g.append(c)
+                
+        clean_df_g = df_mensual_g[cols_to_keep_g].fillna(0).replace([np.inf, -np.inf], 0)
+        all_records.extend(clean_df_g.to_dict(orient='records'))
+    except Exception as e:
+        print(f"Advertencia: No se pudo generar la vista global. Error: {e}")
+    # =====================================================
+
     for ag_id in agentes:
         df_ag = df[df['id_agente'] == ag_id]
         if len(df_ag) == 0: continue
@@ -179,6 +220,13 @@ def generate_metrics_dashboard(monthly_dict, out_path="reports/metrics_historic_
             agents_list.append({'id': ag_id, 'name': info['name'], 'avg_score': avg_score})
             
     agents_list.sort(key=lambda x: x['avg_score'], reverse=True)
+    
+    # Force GLOBAL to be the very first option in the UI dropdown
+    global_item = next((item for item in agents_list if item['id'] == 'GLOBAL'), None)
+    if global_item:
+        agents_list.remove(global_item)
+        agents_list.insert(0, global_item)
+        
     agents_list_json = json.dumps(agents_list)
     
     template_str = """
@@ -2161,130 +2209,105 @@ ${popoverContent}
                     range: [0, 10]
                 };
                 
-            } else if (m === 'tendencia') {
-                // ═══════════════════════════════════════════════════════════
-                //  TENDENCIA HISTÓRICA — Delta Trend Card Redesign
-                // ═══════════════════════════════════════════════════════════
+            } else if (m === 'tendencia') { 
+                // ═══════════════════════════════════════════════════════════ 
+                //  TENDENCIA HISTÓRICA — Curvilíneo + Pendiente Global 
+                // ═══════════════════════════════════════════════════════════ 
+                const  hover_texts = []; 
+                const  scores = y_vals; 
+                
+                const firstVal = scores[0] || 0 ; 
+                const lastVal = scores[scores.length - 1] || 0 ; 
+                const  overall_delta = lastVal - firstVal; 
 
-                const firstMonth = x_vals[0];
-                const firstVal = y_vals[0];
-                const firstFormatted = formatted_x[0];
-                const lastFormatted = formatted_x[formatted_x.length - 1];
-                const d_s = lastVal - firstVal;
-                const isUp = d_s > 0;
-                const isFlat = Math.abs(d_s) < 0.005;
+                for (let i = 0 ; i < series.length; i++) { 
+                    const  s = scores[i]; 
+                    const prev_s = i > 0 ? scores[i-1] : null ; 
 
-                // Color logic
-                const deltaColor = isFlat ? '#64748b' : (isUp ? '#10b981' : '#ef4444');
+                    const  real_data = { 
+                        "Score Tendencia": formatScore(s) + " / 10" 
+                    }; 
+                    
+                    const  change_data = {}; 
+                    if (prev_s !== null ) { 
+                        const  d_s = s - prev_s; 
+                        change_data["Δ vs Mes Anterior"] = (d_s > 0 ? '+' : '' ) + formatPP(d_s); 
+                    } 
+                    
+                    hover_texts.push(buildTooltipHTML(formatted_x[i], real_data, change_data, s)); 
+                } 
 
-                // Spanish status label
-                let statusText, statusBg;
-                if (isFlat)       { statusText = 'Estable';     statusBg = 'rgba(100,116,139,0.12)'; }
-                else if (isUp)    { statusText = 'Mejorando';   statusBg = 'rgba(16,185,129,0.12)'; }
-                else              { statusText = 'Empeorando';  statusBg = 'rgba(239,68,68,0.12)'; }
+                // Lógica de estado de la pendiente global 
+                let statusText = "→ Estable" ; 
+                let statusColor = "#64748b" ; 
+                if (overall_delta > 0.5 ) { 
+                    statusText = "▲ Tendencia Positiva" ; 
+                    statusColor = "#10b981" ; 
+                } else if (overall_delta < -0.5 ) { 
+                    statusText = "▼ Tendencia Negativa" ; 
+                    statusColor = "#ef4444" ; 
+                } 
 
-                // Standardized tooltips
-                const hover_texts = [];
+                // CAPA A: Gráfico curvilíneo con todos los meses (Spline) 
+                traces.push({ 
+                    x : x_vals, 
+                    y : scores, 
+                    customdata : hover_texts, 
+                    type: 'scatter' , 
+                    mode: 'lines+markers' , 
+                    name: 'Score Mensual' , 
+                    line: { color: config.color, width: 3, shape: 'spline'  }, 
+                    marker : { 
+                        size: x_vals.map((_, i) => i === x_vals.length - 1 ? 10 : 6 ), 
+                        color : config.color, 
+                        line: { color: '#ffffff', width: x_vals.map((_, i) => i === x_vals.length - 1 ? 2 : 1 ) } 
+                    }, 
+                    fill: 'tozeroy' , 
+                    fillcolor: hexToRgba(config.color, 0.12 ), 
+                    hovertemplate: '%{customdata}<extra></extra>' 
+                }); 
 
-                // First endpoint tooltip
-                hover_texts.push(buildTooltipHTML(firstFormatted, {
-                    "Tendencia score": formatScore(firstVal) + ' / 10'
-                }, {}, firstVal));
+                // CAPA B: Línea de Pendiente Global (Dashed) 
+                if (scores.length > 1 ) { 
+                    traces.push({ 
+                        x: [x_vals[0], x_vals[x_vals.length - 1 ]], 
+                        y : [firstVal, lastVal], 
+                        type: 'scatter' , 
+                        mode: 'lines' , 
+                        name: 'Pendiente' , 
+                        line: { color: statusColor, width: 2, dash: 'dash'  }, 
+                        hoverinfo: 'skip' 
+                    }); 
+                } 
 
-                // Last endpoint tooltip
-                const change_data = {};
-                change_data["Δ Tendencia"] = (d_s > 0 ? '+' : '') + d_s.toFixed(2) + ' pts';
-                hover_texts.push(buildTooltipHTML(lastFormatted, {
-                    "Tendencia score": formatScore(lastVal) + ' / 10'
-                }, change_data, lastVal));
+                const delta_str = (overall_delta > 0 ? '+' : '') + overall_delta.toFixed(2 ); 
 
-                // Bridge trace — thick line with large endpoint markers
-                traces.push({
-                    x: [firstMonth, lastMonth],
-                    y: [firstVal, lastVal],
-                    customdata: hover_texts,
-                    type: 'scatter',
-                    mode: 'lines+markers',
-                    line: { color: deltaColor, width: 4, shape: 'linear' },
-                    marker: {
-                        size: [14, 14],
-                        color: deltaColor,
-                        line: { color: '#ffffff', width: 3 }
-                    },
-                    hovertemplate: '%{customdata}<extra></extra>',
-                    showlegend: false
-                });
+                layout.annotations = [ 
+                    { 
+                        x: 0, y: 1.13, xref: 'paper', yref: 'paper' , 
+                        xanchor: 'left', yanchor: 'top' , 
+                        text: `<b><span style="color:${statusColor};">${statusText}</span></b>` , 
+                        showarrow: false , 
+                        font: {size: 12, family: 'Inter' } 
+                    }, 
+                    { 
+                        x: 1, y: 1.15, xref: 'paper', yref: 'paper' , 
+                        xanchor: 'right', yanchor: 'top' , 
+                        text: `<b><span style="font-size:14px;color:#0f172a;">${lastVal.toFixed(2)} / 10</span></b><br>`  + 
+                              `<span style="color:${statusColor}; font-size:11px; font-weight:600;">Δ Global: ${delta_str} pts</span>` , 
+                        showarrow: false , 
+                        align: 'right' 
+                    } 
+                ]; 
 
-                // Layout — clean card, no gridlines
-                layout.margin = { t: 20, b: 45, l: 30, r: 30 };
-                layout.showlegend = false;
-                layout.hovermode = 'closest';
-                layout.plot_bgcolor = 'transparent';
-                layout.paper_bgcolor = '#ffffff';
-
-                layout.xaxis = {
-                    type: 'category',
-                    tickmode: 'array',
-                    tickvals: [firstMonth, lastMonth],
-                    ticktext: [firstFormatted, lastFormatted],
-                    tickangle: 0,
-                    showgrid: false,
-                    zeroline: false,
-                    showline: false,
-                    tickfont: { size: 10, color: '#64748b', family: 'Inter' }
+                layout.margin = { t: 50, b: 60, l: 45, r: 30  }; 
+                layout.yaxis = { 
+                    range: [0, 10.5 ], 
+                    showline: true, linewidth: 1.5, linecolor: '#cbd5e1' , 
+                    ticks: 'outside', tickcolor: '#cbd5e1', ticklen: 5 , 
+                    showgrid: true, gridcolor: 'rgba(241, 245, 249, 0.6)', zeroline: true, zerolinecolor: '#cbd5e1' , 
+                    tickfont: { size: 10, color: '#475569', family: 'Inter'  } 
                 };
-
-                layout.yaxis = {
-                    range: [0, 10.5],
-                    showgrid: false,
-                    zeroline: false,
-                    showline: false,
-                    showticklabels: false
-                };
-
-                // Annotations: Hero Delta + Status + Subtitle + Endpoint values
-                const deltaSign = d_s > 0 ? '+' : '';
-                layout.annotations = [
-                    // Hero Δ — large centered
-                    {
-                        x: 0.5, y: 0.92, xref: 'paper', yref: 'paper',
-                        xanchor: 'center', yanchor: 'middle',
-                        text: `<b><span style="font-size:28px;color:${deltaColor};">Δ ${deltaSign}${d_s.toFixed(2)} pts</span></b>`,
-                        showarrow: false, font: { family: 'Inter' }
-                    },
-                    // Spanish status badge
-                    {
-                        x: 0.5, y: 0.78, xref: 'paper', yref: 'paper',
-                        xanchor: 'center', yanchor: 'middle',
-                        text: `<b><span style="color:${deltaColor};font-size:11px;">${statusText}</span></b>`,
-                        showarrow: false, font: { family: 'Inter', size: 11 },
-                        bgcolor: statusBg, borderpad: 5,
-                        bordercolor: 'rgba(0,0,0,0)', borderwidth: 0
-                    },
-                    // Subtitle: month range
-                    {
-                        x: 0.5, y: 0.67, xref: 'paper', yref: 'paper',
-                        xanchor: 'center', yanchor: 'middle',
-                        text: `<span style="font-size:10px;color:#94a3b8;">${firstFormatted} → ${lastFormatted}</span>`,
-                        showarrow: false, font: { family: 'Inter', size: 10 }
-                    },
-                    // Left endpoint value
-                    {
-                        x: firstMonth, y: firstVal,
-                        xanchor: 'right', yanchor: 'middle',
-                        xshift: -12,
-                        text: `<b><span style="font-size:13px;color:${deltaColor};">${firstVal.toFixed(1)}</span></b>`,
-                        showarrow: false, font: { family: 'Inter' }
-                    },
-                    // Right endpoint value
-                    {
-                        x: lastMonth, y: lastVal,
-                        xanchor: 'left', yanchor: 'middle',
-                        xshift: 12,
-                        text: `<b><span style="font-size:13px;color:${deltaColor};">${lastVal.toFixed(1)}</span></b>`,
-                        showarrow: false, font: { family: 'Inter' }
-                    }
-                ];
 
             } else if (m === 'diversificacion') {
                 // ═══════════════════════════════════════════════════════════
