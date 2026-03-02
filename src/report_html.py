@@ -174,7 +174,12 @@ def generate_html_report(df_agents, df_monthly=None, out_path="reports/dashboard
         records = monthly_min.to_dict(orient='records')
         monthly_dict = {}
         for row in records:
-            key = str(int(row.pop('id_agente')))
+            raw_id = row.pop('id_agente')
+            # Handle float conversions safely but keep 'GLOBAL' string intact
+            if isinstance(raw_id, float) and not np.isnan(raw_id):
+                key = str(int(raw_id))
+            else:
+                key = str(raw_id)
             monthly_dict.setdefault(key, []).append(row)
         
         monthly_data_js = json.dumps(monthly_dict)
@@ -1068,7 +1073,7 @@ def generate_html_report(df_agents, df_monthly=None, out_path="reports/dashboard
         if (event) event.stopPropagation();
         // Prevent selecting the agent that is currently active in the ranking
         const activeItem = document.querySelector('.agent-item.active');
-        const activeId = activeItem ? parseInt(activeItem.dataset.id) : null;
+        const activeId = activeItem ? activeItem.dataset.id : null;
         if (agentId === activeId) return;
         
         const idx = selectedCompareIds.indexOf(agentId);
@@ -1107,7 +1112,7 @@ def generate_html_report(df_agents, df_monthly=None, out_path="reports/dashboard
         
         // Find the currently active (ranking-selected) agent
         const activeItem = document.querySelector('.agent-item.active');
-        const activeId = activeItem ? parseInt(activeItem.dataset.id) : null;
+        const activeId = activeItem ? activeItem.dataset.id : null;
         const activeAgent = activeId ? (displayedAgents.find(a => a.id_agente == activeId) || allAgents.find(a => a.id_agente == activeId)) : null;
         
         if (bar) {
@@ -1152,7 +1157,7 @@ def generate_html_report(df_agents, df_monthly=None, out_path="reports/dashboard
 
     function updateCompareCheckboxes() {
         document.querySelectorAll('.ms-option').forEach(opt => {
-            const id = parseInt(opt.dataset.id);
+            const id = opt.dataset.id;
             const cb = opt.querySelector('input[type="checkbox"]');
             const isSelected = selectedCompareIds.includes(id);
             if (cb) cb.checked = isSelected;
@@ -1172,7 +1177,7 @@ def generate_html_report(df_agents, df_monthly=None, out_path="reports/dashboard
         
         // Find active ranking agent to exclude from dropdown
         const activeItem = document.querySelector('.agent-item.active');
-        const activeId = activeItem ? parseInt(activeItem.dataset.id) : null;
+        const activeId = activeItem ? activeItem.dataset.id : null;
         
         const sorted = [...displayedAgents].sort((a,b) => a.rank_global - b.rank_global);
         sorted.forEach(a => {
@@ -1304,7 +1309,7 @@ def generate_html_report(df_agents, df_monthly=None, out_path="reports/dashboard
             
             el.innerHTML = `
                 <div style="display:flex; align-items:center; gap:12px; width:100%;">
-                    <div class="agent-rank">#${a.rank_global}</div>
+                    <div class="agent-rank">${a.id_agente === 'GLOBAL' ? '' : '#'}${a.rank_global}</div>
                     <div class="agent-name">${a.nombre_usuario_agente || a.id_agente}</div>
                     <div class="agent-badge badge-${a.Clase}">${a.Clase}</div>
                 </div>
@@ -1783,7 +1788,7 @@ def generate_html_report(df_agents, df_monthly=None, out_path="reports/dashboard
              
              // Determine if in multi-agent mode
              const activeItem2 = document.querySelector('.agent-item.active');
-             const activeId2 = activeItem2 ? parseInt(activeItem2.dataset.id) : null;
+             const activeId2 = activeItem2 ? activeItem2.dataset.id : null;
              const compareIds = selectedCompareIds.filter(cid => cid != activeId2);
              const isMulti = compareIds.length > 0;
              const agentName = a.nombre_usuario_agente || 'Seleccionado';

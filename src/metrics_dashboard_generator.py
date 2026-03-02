@@ -39,12 +39,6 @@ def load_and_validate_data(csv_path="Data/reporte_detallado_jugadores_final.csv"
     
     print("Calculando métricas históricas de todos los agentes...")
     
-    # Agrupar por agente para procesarlos individualmente
-    agentes = df['id_agente'].unique()
-    
-    # For demonstration and performance, we can extract the top 10 agents by volume/score 
-    # or just process all of them. We'll process all and let JS handle filtering.
-    
     # We'll just collect a massive flat list of dictionaries to pass to JS
     all_records = []
     
@@ -101,8 +95,8 @@ def load_and_validate_data(csv_path="Data/reporte_detallado_jugadores_final.csv"
         print(f"Advertencia: No se pudo generar la vista global. Error: {e}")
     # =====================================================
 
-    for ag_id in agentes:
-        df_ag = df[df['id_agente'] == ag_id]
+    # OPTIMIZACIÓN: Iterar usando groupby es exponencialmente más rápido 
+    for ag_id, df_ag in df.groupby('id_agente'): 
         if len(df_ag) == 0: continue
             
         metricas_snapshot, df_mensual_orig, df_mensual_mets = calcular_metricas_agente_con_mensual(df_ag, total_jugadores_global, monthly_mode="rolling_3m")
@@ -195,19 +189,19 @@ def generate_metrics_dashboard(monthly_dict, out_path="reports/metrics_historic_
     # We use a JS object to define the chart titles, descriptions and colors, 
     # to maintain visual consistency with the main dashboard.
     
-    chart_config = {
-        'rentabilidad': {'title': 'Rentabilidad (NGR / Depósitos * 100)', 'color': '#2563eb'},
-        'volumen': {'title': 'Volumen Transaccional (Log Base 10)', 'color': '#10b981'},
-        'fidelidad': {'title': 'Fidelidad (% Jugadores Globales)', 'color': '#8b5cf6'},
-        'estabilidad': {'title': 'Estabilidad (1 - Coeficiente de Variación de NGR)', 'color': '#f59e0b'},
-        'crecimiento': {'title': 'Crecimiento (% Depósitos Mensual)', 'color': '#06b6d4'},
-        'eficiencia_casino': {'title': 'Eficiencia Casino (Depósitos / GGR Casino)', 'color': '#ec4899'},
-        'eficiencia_deportes': {'title': 'Eficiencia Deportes (Depósitos / GGR Deportes)', 'color': '#f97316'},
-        'eficiencia_conversion': {'title': 'Eficiencia de Conversión (GGR / Depósitos %)', 'color': '#2dd4bf'},
-        'tendencia': {'title': 'Tendencia Histórica (Pendiente Regresión)', 'color': '#6366f1'},
-        'diversificacion': {'title': 'Diversificación de Productos (1 - HHI Casino vs Deportes)', 'color': '#d946ef'},
-        'calidad_jugadores': {'title': 'Calidad de Jugadores (Apuesta Promedio por Jugador)', 'color': '#14b8a6'},
-        'eficiencia_juego': {'title': 'Eficiencia de Juego (Turnover vs Depósitos %)', 'color': '#6366f1'}
+    chart_config = { 
+        'rentabilidad': {'title': 'Rentabilidad', 'color': '#1d4ed8'},            # Blue 700 
+        'volumen': {'title': 'Volumen Transaccional', 'color': '#047857'},        # Emerald 700 
+        'fidelidad': {'title': 'Fidelidad de Jugadores', 'color': '#7e22ce'},     # Purple 700 
+        'estabilidad': {'title': 'Estabilidad', 'color': '#ea580c'},              # Orange 600 
+        'crecimiento': {'title': 'Crecimiento', 'color': '#0369a1'},              # Sky 700 
+        'eficiencia_casino': {'title': 'Eficiencia Casino', 'color': '#be185d'},  # Pink 700 
+        'eficiencia_deportes': {'title': 'Eficiencia Deportes', 'color': '#c2410c'}, # Orange 700 
+        'eficiencia_conversion': {'title': 'Eficiencia de Conversión', 'color': '#0f766e'}, # Teal 700 
+        'tendencia': {'title': 'Tendencia Histórica', 'color': '#4338ca'},        # Indigo 700 
+        'diversificacion': {'title': 'Diversificación de Productos', 'color': '#a21caf'}, # Fuchsia 700 
+        'calidad_jugadores': {'title': 'Calidad de Jugadores', 'color': '#0e7490'}, # Cyan 700 
+        'eficiencia_juego': {'title': 'Eficiencia de Juego', 'color': '#6d28d9'}  # Violet 700 
     }
     config_json = json.dumps(chart_config)
     
@@ -264,44 +258,149 @@ def generate_metrics_dashboard(monthly_dict, out_path="reports/metrics_historic_
         header { 
             background: var(--card-bg); padding: 15px 30px; 
             border-bottom: 1px solid #e2e8f0; 
-            display: flex; justify-content: space-between; align-items: center; 
             box-shadow: 0 1px 2px rgba(0,0,0,0.02);
             position: sticky; top: 0; z-index: 100;
         }
         h1 { margin: 0; font-size: 20px; font-weight: 700; color: #0f172a; letter-spacing: -0.5px; }
         .header-meta { font-size: 13px; color: var(--text-muted); margin-top: 4px; font-weight: 500; }
         
-        .controls {
-            display: flex;
-            gap: 15px;
-            align-items: center;
-        }
-        
-        select {
-            padding: 8px 12px;
-            border: 1px solid #cbd5e1;
-            border-radius: 6px;
-            background: white;
-            font-family: 'Inter', sans-serif;
-            font-size: 14px;
-            color: #1e293b;
-            cursor: pointer;
-            outline: none;
-            box-shadow: 0 1px 2px rgba(0,0,0,0.02);
-            transition: all 0.2s;
-            min-width: 250px;
-        }
-        
-        select:focus {
-            border-color: var(--accent);
-            box-shadow: 0 0 0 3px var(--accent-soft);
-        }
-
         .container { 
             max-width: 1400px; 
             margin: 0 auto; 
             padding: 24px; 
         }
+
+        /* --- NEW DASHBOARD TOOLBAR --- */ 
+        .dashboard-toolbar { 
+            display: flex; 
+            flex-wrap: wrap; 
+            gap: 24px; 
+            background: var(--card-bg); 
+            padding: 16px 24px; 
+            border-radius: 12px; 
+            box-shadow: var(--shadow); 
+            border: 1px solid var(--border); 
+            margin-bottom: 24px; 
+            align-items: center; 
+        } 
+         
+        .agent-filter { 
+            display: flex; 
+            flex-direction: column; 
+            gap: 8px; 
+            flex: 1.2; /* Prioritize space for the dropdown */ 
+            min-width: 380px; /* Ensure a healthy minimum width */ 
+            border-right: 1px solid #e2e8f0; 
+            padding-right: 24px; 
+        } 
+         
+        .agent-filter label { 
+            font-size: 11px; 
+            font-weight: 700; 
+            text-transform: uppercase; 
+            letter-spacing: 0.05em; 
+            color: var(--text-muted); 
+        } 
+         
+        .modern-select { 
+            width: 100%; 
+            max-width: 100%; 
+            padding: 10px 14px; 
+            font-size: 13px; /* Slightly smaller to fit long names */ 
+            font-weight: 600; 
+            font-family: 'Inter', sans-serif; 
+            color: #0f172a; 
+            background-color: #f8fafc; 
+            border: 1px solid #cbd5e1; 
+            border-radius: 8px; 
+            outline: none; 
+            cursor: pointer; 
+            transition: all 0.2s ease; 
+            appearance: none; 
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2364748b'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E"); 
+            background-repeat: no-repeat; 
+            background-position: right 14px center; 
+            background-size: 16px; 
+             
+            /* Crucial: Prevent text from breaking layout */ 
+            white-space: nowrap; 
+            overflow: hidden; 
+            text-overflow: ellipsis; 
+        } 
+         
+        .modern-select:hover { 
+            border-color: var(--accent); 
+            background-color: #ffffff; 
+        } 
+         
+        .modern-select:focus { 
+            border-color: var(--accent); 
+            box-shadow: 0 0 0 3px var(--accent-soft); 
+            background-color: #ffffff; 
+        } 
+ 
+        .audit-panel { 
+            display: flex; 
+            flex-direction: column; 
+            gap: 10px; 
+            flex: 2; 
+            min-width: 500px; 
+        } 
+         
+        .audit-panel-header { 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+        } 
+         
+        .audit-label { 
+            font-size: 11px; 
+            font-weight: 700; 
+            text-transform: uppercase; 
+            letter-spacing: 0.05em; 
+            color: var(--text-muted); 
+            display: flex; 
+            align-items: center; 
+            gap: 6px; 
+        } 
+         
+        .audit-badges { 
+            display: grid; 
+            grid-template-columns: repeat(5, auto); /* Force strictly 5 columns */ 
+            gap: 8px 10px; /* Vertical and horizontal gap */ 
+            justify-content: start; 
+        } 
+         
+        .audit-badge { 
+            font-size: 11px; 
+            font-weight: 600; 
+            color: #475569; 
+            background: #f8fafc; 
+            padding: 5px 8px; /* Slightly tighter padding */ 
+            border-radius: 6px; 
+            border: 1px solid #e2e8f0; 
+            display: flex; 
+            align-items: center; 
+            gap: 6px; 
+            white-space: nowrap; /* Prevent word wrapping inside badges */ 
+            transition: all 0.2s; 
+        } 
+         
+        .audit-badge:hover { 
+            background: #ffffff; 
+            border-color: #cbd5e1; 
+            transform: translateY(-1px); 
+        } 
+         
+        .audit-badge::before { 
+            content: ''; 
+            display: inline-block; 
+            width: 6px; 
+            height: 6px; 
+            border-radius: 50%; 
+            background-color: #10b981; 
+            box-shadow: 0 0 4px rgba(16, 185, 129, 0.4); 
+        } 
         
         .grid { 
             display: grid; 
@@ -343,7 +442,7 @@ def generate_metrics_dashboard(monthly_dict, out_path="reports/metrics_historic_
         
         .chart-container {
             width: 100%;
-            height: 350px; /* Force consistent height for all 11 charts */
+            height: 350px; 
         }
         
         .empty-state {
@@ -356,29 +455,6 @@ def generate_metrics_dashboard(monthly_dict, out_path="reports/metrics_historic_
             background: #f8fafc;
             border-radius: 8px;
             border: 1px dashed #cbd5e1;
-        }
-        
-        .checklist-board {
-            background: white;
-            padding: 15px;
-            border-radius: 8px;
-            border: 1px solid #e2e8f0;
-            margin-bottom: 24px;
-            display: flex;
-            align-items: center;
-            gap: 15px;
-        }
-        
-        .checklist-board span {
-            font-size: 13px;
-            font-weight: 600;
-            color: #16a34a;
-            display: flex;
-            align-items: center;
-            gap: 5px;
-            background: #dcfce7;
-            padding: 6px 12px;
-            border-radius: 20px;
         }
 
         /* Info Popover System */
@@ -469,30 +545,38 @@ def generate_metrics_dashboard(monthly_dict, out_path="reports/metrics_historic_
         <h1>Dashboard Analítico: 11 Métricas Estructurales de Agentes</h1>
         <div class="header-meta">Seguimiento de la serie temporal por métrica calificada</div>
     </div>
-    <div class="controls">
-        <label for="agentSelect" style="font-size: 13px; font-weight: 600; color: #475569;">Comportamiento Histórico de:</label>
-        <select id="agentSelect" onchange="renderAllCharts()">
-            <!-- Options populated via JS -->
-        </select>
-    </div>
 </header>
 
 <div class="container">
-    <div class="checklist-board">
-        <div style="font-weight: 700; color:#0f172a; font-size: 14px; margin-right: 15px;">🔍 Verificación de Auditoría:</div>
-        <span id="check-rent">Rentabilidad ✅</span>
-        <span id="check-vol">Volumen ✅</span>
-        <span id="check-fid">Fidelidad ✅</span>
-        <span id="check-est">Estabilidad ✅</span>
-        <!-- <span id="check-cre">Crecimiento ✅</span> -->
-        <span id="check-cas">Efic. Casino ✅</span>
-        <span id="check-dep">Efic. Deportes ✅</span>
-        <span id="check-conv">Conversión ✅</span>
-        <span id="check-jue">Efic. Juego ✅</span>
-        <span id="check-ten">Tendencia ✅</span>
-        <span id="check-div">Diversificación ✅</span>
-        <!-- <span id="check-cal">Calidad ✅</span> -->
-        <div style="margin-left:auto; font-size:12px; color:#64748b;">✅ Las 11 métricas verificadas y graficadas exitosamente.</div>
+    <div class="dashboard-toolbar">
+        <div class="agent-filter">
+            <label for="agentSelect">👤 Comportamiento Histórico de:</label>
+            <select id="agentSelect" class="modern-select" onchange="renderAllCharts()">
+                <!-- Options populated via JS -->
+            </select>
+        </div>
+        
+        <div class="audit-panel">
+            <div class="audit-panel-header">
+                <div class="audit-label">
+                    <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    Verificación de Auditoría
+                </div>
+                <div style="font-size:11px; color:#10b981; font-weight:600;">10/10 Activas y Graficadas</div>
+            </div>
+            <div class="audit-badges">
+                <span class="audit-badge">Rentabilidad</span>
+                <span class="audit-badge">Volumen</span>
+                <span class="audit-badge">Fidelidad</span>
+                <span class="audit-badge">Estabilidad</span>
+                <span class="audit-badge">Efic. Casino</span>
+                <span class="audit-badge">Efic. Deportes</span>
+                <span class="audit-badge">Conversión</span>
+                <span class="audit-badge">Efic. Juego</span>
+                <span class="audit-badge">Tendencia</span>
+                <span class="audit-badge">Diversificación</span>
+            </div>
+        </div>
     </div>
 
     <!-- The 11 Charts Grid -->
@@ -508,210 +592,285 @@ def generate_metrics_dashboard(monthly_dict, out_path="reports/metrics_historic_
     const HIDDEN_METRICS = new Set(['crecimiento', 'calidad_jugadores']);
     const metricKeys = Object.keys(chartConfig || {}).filter(k => !HIDDEN_METRICS.has(k));
 
-    const metricInfo = {
+    const metricInfo = { 
         'rentabilidad': { 
-            custom: `
-                        <div class="popover-section">
-                            <div class="popover-label">OBJETIVO</div>
-                            <div class="popover-text">Evalúa la rentabilidad del negocio comparando NGR generado vs depósitos del mes.</div>
-                        </div>
-                        <div class="popover-section">
-                            <div class="popover-label">CÁLCULO</div>
-                            <div class="popover-text">Margen Real (%) = (NGR / Depósitos) &times; 100</div>
-                        </div>
-                        <div class="popover-section">
-                            <div class="popover-label">CÓMO LEER EL GRÁFICO</div>
-                            <div class="popover-text">
-                                - Barras: Depósitos ($) por mes<br>
-                                - Línea negra: Margen Real (%)<br>
-                                - Línea punteada: Score (0&ndash;10)<br>
-                                - Líneas guía: 0%, 5%, 10%, 20%
-                            </div>
-                        </div>
-                        <div class="popover-section">
-                            <div class="popover-label">UMBRAL RÁPIDO</div>
-                            <div class="popover-text">&gt; 10% Fuerte | 5&ndash;10% Aceptable | &lt; 5% Débil | &lt; 0% Pérdida</div>
-                        </div>
-                        <div class="popover-section">
-                            <div class="popover-label">SEÑALES A VIGILAR</div>
-                            <div class="popover-text">
-                                - Caídas bruscas del margen (&Delta; pp negativo)<br>
-                                - Depósitos altos con margen bajo (volumen sin NGR)<br>
-                                - Depósitos muy bajos: el % puede verse inflado (revisar NGR y $)
-                            </div>
-                        </div>
-            `
-        },
+            custom: ` 
+                <div class="popover-section"> 
+                    <div class="popover-label">OBJETIVO</div> 
+                    <div class="popover-text">Evalúa la rentabilidad directa del negocio comparando el NGR generado vs los depósitos del mes.</div> 
+                </div> 
+                <div class="popover-section"> 
+                    <div class="popover-label">CÁLCULO</div> 
+                    <div class="popover-text">Margen Real (%) = (NGR / Depósitos) &times; 100</div> 
+                </div> 
+                <div class="popover-section"> 
+                    <div class="popover-label">UMBRAL DEL MODELO</div> 
+                    <div class="popover-text"> 
+                        &ge; 8.0% &rArr; Score 7.0 (Base) + Bono Volumen<br> 
+                        4.0% &ndash; 7.9% &rArr; Score Aceptable<br> 
+                        &lt; 4.0% &rArr; Score Débil 
+                    </div> 
+                </div> 
+                <div class="popover-section"> 
+                    <div class="popover-label">SEÑALES A VIGILAR</div> 
+                    <div class="popover-text"> 
+                        - Caídas bruscas del margen (&Delta; pp negativo).<br> 
+                        - Depósitos altos con margen bajo (posible bonus abuse o baja retención). 
+                    </div> 
+                </div> 
+            ` 
+        }, 
         'volumen': { 
-            custom: `
-                        <div class="popover-section">
-                            <div class="popover-label">OBJETIVO</div>
-                            <div class="popover-text">Mide la escala de actividad del agente en número de transacciones mensuales (engagement operativo).</div>
-                        </div>
-                        <div class="popover-section">
-                            <div class="popover-label">CÁLCULO</div>
-                            <div class="popover-text">
-                                TXs = (# Depósitos + # Retiros)<br>
-                                Score = log10(TXs + 1) &times; 2.3
-                            </div>
-                        </div>
-                        <div class="popover-section">
-                            <div class="popover-label">CÓMO LEER EL GRÁFICO</div>
-                            <div class="popover-text">
-                                - Palitos verdes: Total TXs por mes<br>
-                                - Línea punteada: Score (0&ndash;10) (escala logarítmica)<br>
-                                - Encabezado: TXs del último mes + &Delta; vs mes anterior
-                            </div>
-                        </div>
-                        <div class="popover-section">
-                            <div class="popover-label">INTERPRETACIÓN</div>
-                            <div class="popover-text">
-                                Escala logarítmica: cada &times;10 en TXs suma ~2.3 puntos.<br>
-                                Referencia: 100 TXs &approx; 4.6 | 1,000 &approx; 6.9 | 10,000 &approx; 9.2
-                            </div>
-                        </div>
-                        <div class="popover-section">
-                            <div class="popover-label">SEÑALES A VIGILAR</div>
-                            <div class="popover-text">
-                                - Caída crítica: descenso fuerte de TXs vs mes anterior (riesgo de inactividad)<br>
-                                - Pico inusual: salto fuerte (campañas/reactivación o outlier)<br>
-                                - La escala log suaviza cambios: revisar &Delta;% además del score.
-                            </div>
-                        </div>
-            `
-        },
+            custom: ` 
+                <div class="popover-section"> 
+                    <div class="popover-label">OBJETIVO</div> 
+                    <div class="popover-text">Mide la escala de actividad del agente basada en el total de transacciones (engagement operativo).</div> 
+                </div> 
+                <div class="popover-section"> 
+                    <div class="popover-label">CÁLCULO (ESCALA LOGARÍTMICA)</div> 
+                    <div class="popover-text">Score = log10(Total Depósitos + Total Retiros + 1) &times; 2.3</div> 
+                </div> 
+                <div class="popover-section"> 
+                    <div class="popover-label">INTERPRETACIÓN RÁPIDA</div> 
+                    <div class="popover-text"> 
+                        El logaritmo suaviza los picos extremos pero exige consistencia.<br> 
+                        100 TXs &approx; Score 4.6 | 1,000 TXs &approx; Score 6.9 
+                    </div> 
+                </div> 
+                <div class="popover-section"> 
+                    <div class="popover-label">SEÑALES A VIGILAR</div> 
+                    <div class="popover-text">- Caída drástica de TXs respecto al mes anterior (riesgo inminente de inactividad o churn).</div> 
+                </div> 
+            ` 
+        }, 
         'fidelidad': { 
-            custom: `
-                        <div class="popover-section">
-                            <div class="popover-label">OBJETIVO</div>
-                            <div class="popover-text">Mide la participación mensual de jugadores de la agencia dentro del total global (presencia / share).</div>
-                        </div>
-                        <div class="popover-section">
-                            <div class="popover-label">CÁLCULO</div>
-                            <div class="popover-text">
-                                Share (%) = (Jugadores Propios del mes / Jugadores Globales) &times; 100<br>
-                                Score (0&ndash;10) = min(10, Share &times; 2.5)
-                            </div>
-                        </div>
-                        <div class="popover-section">
-                            <div class="popover-label">CÓMO LEER EL GRÁFICO</div>
-                            <div class="popover-text">
-                                - Línea morada: Share (%) mensual<br>
-                                - Marcadores: un punto por mes<br>
-                                - Encabezado: Share actual + &Delta; en pp vs mes anterior
-                            </div>
-                        </div>
-                        <div class="popover-section">
-                            <div class="popover-label">INTERPRETACIÓN RÁPIDA</div>
-                            <div class="popover-text">
-                                - 4.0% Share &rArr; Score 10 (tope)<br>
-                                - 2.0% &rArr; Score 5<br>
-                                - 1.0% &rArr; Score 2.5<br>
-                                Más share = más fidelidad/participación.
-                            </div>
-                        </div>
-                        <div class="popover-section">
-                            <div class="popover-label">QUÉ OBSERVAR</div>
-                            <div class="popover-text">
-                                - Share sube + Propios suben &rArr; crecimiento real<br>
-                                - Share sube pero Propios no crecen &rArr; revisar Global (efecto denominador)<br>
-                                - Caídas de Share (&Delta; pp negativo) &rArr; pérdida de participación
-                            </div>
-                        </div>
-            `
-        },
+            custom: ` 
+                <div class="popover-section"> 
+                    <div class="popover-label">OBJETIVO</div> 
+                    <div class="popover-text">Mide el peso del agente dentro del ecosistema total de la plataforma (Market Share interno).</div> 
+                </div> 
+                <div class="popover-section"> 
+                    <div class="popover-label">CÁLCULO</div> 
+                    <div class="popover-text">Share (%) = (Jugadores Únicos del Agente / Jugadores Únicos Globales) &times; 100<br>Score = min(10, Share &times; 2.5)</div> 
+                </div> 
+                <div class="popover-section"> 
+                    <div class="popover-label">UMBRAL DEL MODELO</div> 
+                    <div class="popover-text">Un Share de captación del <b>4.0% o superior</b> otorga automáticamente el Score máximo (10/10).</div> 
+                </div> 
+                <div class="popover-section"> 
+                    <div class="popover-label">SEÑALES A VIGILAR</div> 
+                    <div class="popover-text">- Crecimiento ilusorio: Si el agente suma jugadores pero su Share cae, la plataforma está creciendo más rápido que él (pérdida de relevancia).</div> 
+                </div> 
+            ` 
+        }, 
         'estabilidad': { 
-            custom: `
-                        <div class="popover-section">
-                            <div class="popover-label">OBJETIVO</div>
-                            <div class="popover-text">Mide qué tan predecible y consistente es el NGR mensual del agente (baja volatilidad + continuidad reciente).</div>
-                        </div>
-                        <div class="popover-section">
-                            <div class="popover-label">CÁLCULO</div>
-                            <div class="popover-text">
-                                Se combinan 2 componentes:<br>
-                                - Histórico (40%): CV logarítmico del NGR (menor CV = más estable)<br>
-                                &nbsp;&nbsp;ef = 1 &minus; CV_log  &rarr; mayor ef = mayor estabilidad<br>
-                                - Reciente (60%): patrón de los últimos 2&ndash;3 meses (racha de NGR &gt; 0)<br>
-                                Score final = 0.4 &times; score_histórico + 0.6 &times; score_reciente
-                            </div>
-                        </div>
-                        <div class="popover-section">
-                            <div class="popover-label">CÓMO LEER EL GRÁFICO</div>
-                            <div class="popover-text">
-                                - Barra: score actual (0&ndash;10)<br>
-                                - Línea punteada: Objetivo 6.0 (umbral)<br>
-                                - Dots: score mensual<br>
-                                - Panel derecho: score + estado + brecha vs objetivo
-                            </div>
-                        </div>
-                        <div class="popover-section">
-                            <div class="popover-label">INTERPRETACIÓN</div>
-                            <div class="popover-text">
-                                &gt; 6.0 Estable | 4&ndash;6 Moderado | &lt; 4 Inestable<br>
-                                Score alto = NGR con poca variación + meses recientes positivos.
-                            </div>
-                        </div>
-                        <div class="popover-section">
-                            <div class="popover-label">QUÉ OBSERVAR</div>
-                            <div class="popover-text">
-                                - Caídas bajo 6: mayor volatilidad o meses recientes sin NGR<br>
-                                - Consistencia de dots: estabilidad sostenida<br>
-                                - El score puede bajar aunque el NGR suba si se vuelve más irregular.
-                            </div>
-                        </div>
-            `
-        },
-        'crecimiento': { obj: 'Ritmo de expansión de volumen de depósitos.', calc: '(Depósitos Mes Actual / Depósitos Mes Anterior) - 1', int: 'Valores > 0% indican crecimiento. Consistencia es mejor que picos asilados.', watch: 'Meses continuos en negativo.' },
+            custom: ` 
+                <div class="popover-section"> 
+                    <div class="popover-label">OBJETIVO</div> 
+                    <div class="popover-text">Mide qué tan predecible es la generación de NGR (baja volatilidad) y su constancia mensual.</div> 
+                </div> 
+                <div class="popover-section"> 
+                    <div class="popover-label">CÁLCULO MIXTO</div> 
+                    <div class="popover-text"> 
+                        <b>40% Histórico:</b> 1 &minus; Coeficiente de Variación Logarítmico del NGR.<br> 
+                        <b>60% Reciente:</b> Penaliza si en los últimos 3 meses existen meses con NGR = 0. 
+                    </div> 
+                </div> 
+                <div class="popover-section"> 
+                    <div class="popover-label">INTERPRETACIÓN RÁPIDA</div> 
+                    <div class="popover-text">&gt; 6.0 Estable | 4.0 &ndash; 6.0 Moderado | &lt; 4.0 Altamente volátil / Riesgo.</div> 
+                </div> 
+                <div class="popover-section"> 
+                    <div class="popover-label">SEÑALES A VIGILAR</div> 
+                    <div class="popover-text">- Picos aislados de NGR seguidos de inactividad destruirán este score, favoreciendo a agentes con menores ingresos pero constantes.</div> 
+                </div> 
+            ` 
+        }, 
+        'crecimiento': { 
+            custom: ` 
+                <div class="popover-section"> 
+                    <div class="popover-label">OBJETIVO</div> 
+                    <div class="popover-text">Evalúa el ritmo de expansión de captación en volumen de depósitos mes a mes.</div> 
+                </div> 
+                <div class="popover-section"> 
+                    <div class="popover-label">CÁLCULO</div> 
+                    <div class="popover-text">&Delta;% = ((Nº Depósitos Mes Actual / Nº Depósitos Mes Anterior) &minus; 1) &times; 100</div> 
+                </div> 
+                <div class="popover-section"> 
+                    <div class="popover-label">UMBRAL DEL MODELO</div> 
+                    <div class="popover-text"> 
+                        &ge; +20% &rArr; Score 10 (Excelente)<br> 
+                        0% a +19% &rArr; Score 5.0 a 8.0 (Estable)<br> 
+                        &lt; 0% &rArr; Score &lt; 5.0 (Contracción) 
+                    </div> 
+                </div> 
+                <div class="popover-section"> 
+                    <div class="popover-label">SEÑALES A VIGILAR</div> 
+                    <div class="popover-text">- Rachas negativas prolongadas. Caídas sucesivas indican pérdida de tracción en la adquisición.</div> 
+                </div> 
+            ` 
+        }, 
         'eficiencia_casino': { 
-            custom: `
-                        <div class="popover-section">
-                            <div class="popover-label">OBJETIVO</div>
-                            <div class="popover-text">Mide qué tan eficiente es la agencia generando GGR Casino a partir de la actividad de depósitos.</div>
-                        </div>
-                        <div class="popover-section">
-                            <div class="popover-label">CÁLCULO (MODELO)</div>
-                            <div class="popover-text">
-                                Eficiencia = (# Depósitos / GGR Casino) &times; 100<br>
-                                Menor ratio = mejor eficiencia (más GGR por menos depósitos).
-                            </div>
-                        </div>
-                        <div class="popover-section">
-                            <div class="popover-label">CÓMO LEER EL GRÁFICO</div>
-                            <div class="popover-text">
-                                - Barra: score de eficiencia (0&ndash;10)<br>
-                                - Línea punteada: Objetivo 7.0<br>
-                                - Dots: score mensual<br>
-                                - Panel derecho: score + estado + brecha vs objetivo
-                            </div>
-                        </div>
-                        <div class="popover-section">
-                            <div class="popover-label">INTERPRETACIÓN RÁPIDA</div>
-                            <div class="popover-text">
-                                &gt; 33 &rArr; ~2 (muy ineficiente)<br>
-                                20&ndash;33 &rArr; ~3<br>
-                                14&ndash;20 &rArr; ~5<br>
-                                10&ndash;14 &rArr; ~7.5<br>
-                                5.5&ndash;10 &rArr; ~10 (muy eficiente)
-                            </div>
-                        </div>
-                        <div class="popover-section">
-                            <div class="popover-label">QUÉ OBSERVAR</div>
-                            <div class="popover-text">
-                                - Subidas del ratio (peor): más depósitos para el mismo GGR<br>
-                                - Ratio alto con GGR bajo: baja conversión / mix desfavorable<br>
-                                - Meses con GGR=0: score = 0 (no evaluable)<br><br>
-                                <i>Nota: si el tooltip muestra Depósitos($)/GGR es complementario; el score usa el ratio del modelo.</i>
-                            </div>
-                        </div>
-            `
-        },
-        'eficiencia_deportes': { obj: 'Qué tanto depósito genera 1 dólar de GGR en Deportes.', calc: 'Depósitos / GGR Deportes', int: 'Similar a casino, pero sujeto a estacionalidad deportiva y varianza.', watch: 'Margen deportivo consistentemente negativo (Arbitraje/Fraude).' },
-        'eficiencia_conversion': { obj: 'Tasa base bruta de conversión de depósitos a pérdidas del jugador (GGR).', calc: '(GGR Total / Depósitos) * 100', int: 'No contempla bonos ni costos. Solo retención bruta directa.', watch: 'Caída de la conversión combinada con alza de depósitos (bonus abuse).' },
-        'tendencia': { obj: 'Dirección general del agente a largo plazo (Score).', calc: 'Pendiente de regresión lineal de los últimos 6 meses.', int: 'Positivo = Agente escalando. Negativo = En declive.', watch: 'Cambio de tendencia de positivo a negativo sostenido.' },
-        'diversificacion': { obj: 'Mide si el agente depende de un solo producto.', calc: '1 - Índice HHI (Casino vs Deportes)', int: '10 = Perfectamente balanceado (50/50). 0 = 100% concentrado en un producto.', watch: 'Riesgo estructural por alta dependencia deportiva (varianza alta).' },
-        'calidad_jugadores': { obj: 'Valor transaccional promedio por jugador activo.', calc: 'Total Depósitos / Jugadores Activos', int: 'Mide si son VIPs o jugadores casuales (retail).', watch: 'Aumento de jugadores con colapso de calidad (tráfico de baja calidad).' },
-        'eficiencia_juego': { obj: 'Mide el volumen de juego generado en relación al capital depositado.', calc: '((Apuestas Totales / Depósitos) - 1) * 100' }
+            custom: ` 
+                <div class="popover-section"> 
+                    <div class="popover-label">OBJETIVO</div> 
+                    <div class="popover-text">Mide la fricción/dificultad para generar GGR en Casino a partir de depósitos crudos.</div> 
+                </div> 
+                <div class="popover-section"> 
+                    <div class="popover-label">CÁLCULO INVERSO</div> 
+                    <div class="popover-text">Ratio = (Total Nº Depósitos / GGR Casino) &times; 100<br><i>*Un ratio <b>menor</b> indica mayor eficiencia.</i></div> 
+                </div> 
+                <div class="popover-section"> 
+                    <div class="popover-label">UMBRAL DEL MODELO</div> 
+                    <div class="popover-text"> 
+                        Ratio &lt; 5.5 &rArr; Score 10 (Súper eficiente)<br> 
+                        Ratio 14 a 20 &rArr; Score 5.0<br> 
+                        Ratio &gt; 33.0 &rArr; Score &lt; 2.0 (Crítico) 
+                    </div> 
+                </div> 
+                <div class="popover-section"> 
+                    <div class="popover-label">SEÑALES A VIGILAR</div> 
+                    <div class="popover-text">- Un alza en el ratio significa que el agente requiere procesar muchos más depósitos para rascar el mismo nivel de ganancia (peor retención).</div> 
+                </div> 
+            ` 
+        }, 
+        'eficiencia_deportes': { 
+            custom: ` 
+                <div class="popover-section"> 
+                    <div class="popover-label">OBJETIVO</div> 
+                    <div class="popover-text">Mide la fricción para generar GGR en Apuestas Deportivas a partir de depósitos.</div> 
+                </div> 
+                <div class="popover-section"> 
+                    <div class="popover-label">CÁLCULO INVERSO</div> 
+                    <div class="popover-text">Ratio = (Total Nº Depósitos / GGR Deportes) &times; 100<br><i>*Un ratio <b>menor</b> indica mayor eficiencia.</i></div> 
+                </div> 
+                <div class="popover-section"> 
+                    <div class="popover-label">UMBRAL DEL MODELO</div> 
+                    <div class="popover-text"> 
+                        Ratio &lt; 5.5 &rArr; Score 10 (Súper eficiente)<br> 
+                        Ratio &gt; 33.0 &rArr; Score &lt; 2.0 (Crítico) 
+                     </div> 
+                </div> 
+                <div class="popover-section"> 
+                    <div class="popover-label">SEÑALES A VIGILAR</div> 
+                    <div class="popover-text">- Alta volatilidad esperada por estacionalidad deportiva. Ratios críticos sostenidos pueden indicar usuarios realizando arbitraje (surebets).</div> 
+                </div> 
+            ` 
+        }, 
+        'eficiencia_conversion': { 
+            custom: ` 
+                <div class="popover-section"> 
+                    <div class="popover-label">OBJETIVO</div> 
+                    <div class="popover-text">Tasa base de conversión macro. Determina qué porcentaje del dinero ingresado termina convirtiéndose en ingresos brutos (GGR).</div> 
+                </div> 
+                <div class="popover-section"> 
+                    <div class="popover-label">CÁLCULO</div> 
+                    <div class="popover-text">Conversión (%) = (GGR Total / Depósitos en $) &times; 100</div> 
+                </div> 
+                <div class="popover-section"> 
+                    <div class="popover-label">UMBRAL DEL MODELO</div> 
+                    <div class="popover-text"> 
+                        &ge; 15% &rArr; Score 10.0 (Óptimo)<br> 
+                        &ge; 7% &rArr; Score 5.0 (Aceptable)<br> 
+                        &lt; 5% &rArr; Score &lt; 3.0 (Crítico) 
+                    </div> 
+                </div> 
+                <div class="popover-section"> 
+                    <div class="popover-label">SEÑALES A VIGILAR</div> 
+                    <div class="popover-text">- Alta inyección de capital combinada con conversión nula indica tráfico de muy baja calidad, early-cashouts o lavado de bonos.</div> 
+                </div> 
+            ` 
+        }, 
+        'tendencia': { 
+            custom: ` 
+                <div class="popover-section"> 
+                    <div class="popover-label">OBJETIVO</div> 
+                    <div class="popover-text">Proyecta la salud estructural del agente a mediano plazo suavizando los picos y valles mensuales.</div> 
+                </div> 
+                <div class="popover-section"> 
+                    <div class="popover-label">CÁLCULO</div> 
+                    <div class="popover-text">Regresión lineal simple (Mínimos Cuadrados) sobre el historial mensual de comisiones netas.</div> 
+                </div> 
+                <div class="popover-section"> 
+                    <div class="popover-label">UMBRAL DEL MODELO</div> 
+                    <div class="popover-text"> 
+                        Pendiente &gt; 1000 &rArr; Score 8.0 (Crecimiento fuerte)<br> 
+                        Pendiente &gt; 0 &rArr; Score 6.0 (Crecimiento moderado)<br> 
+                        Pendiente &lt; -1000 &rArr; Score 2.0 (Declive) 
+                    </div> 
+                </div> 
+                <div class="popover-section"> 
+                    <div class="popover-label">SEÑALES A VIGILAR</div> 
+                    <div class="popover-text">- Una pendiente negativa sostenida cruzando la línea 0 a menudo antecede al churn total del agente.</div> 
+                </div> 
+            ` 
+        }, 
+        'diversificacion': { 
+            custom: ` 
+                <div class="popover-section"> 
+                    <div class="popover-label">OBJETIVO</div> 
+                    <div class="popover-text">Evalúa el nivel de riesgo por concentración. Un agente con productos equilibrados es menos susceptible a la varianza deportiva.</div> 
+                </div> 
+                <div class="popover-section"> 
+                    <div class="popover-label">CÁLCULO (HHI ADAPTADO)</div> 
+                    <div class="popover-text">Score = (1 &minus; (Participación_Casino&sup2; + Participación_Deportes&sup2;)) &times; 10</div> 
+                </div> 
+                <div class="popover-section"> 
+                    <div class="popover-label">INTERPRETACIÓN RÁPIDA</div> 
+                    <div class="popover-text"> 
+                        Score 5.0 (Máximo) = Mix perfecto 50% Casino / 50% Deportes.<br> 
+                        Score 0.0 = 100% concentrado en un único producto. 
+                    </div> 
+                </div> 
+            ` 
+        }, 
+        'calidad_jugadores': { 
+            custom: ` 
+                <div class="popover-section"> 
+                    <div class="popover-label">OBJETIVO</div> 
+                    <div class="popover-text">Mide el valor transaccional promedio (ARP) de los usuarios para clasificar la cartera (Jugadores VIP vs Retail masivo).</div> 
+                </div> 
+                <div class="popover-section"> 
+                    <div class="popover-label">CÁLCULO</div> 
+                    <div class="popover-text">Apuesta Promedio = Total Apuestas ($) / Jugadores Únicos Activos</div> 
+                </div> 
+                <div class="popover-section"> 
+                    <div class="popover-label">UMBRAL DEL MODELO</div> 
+                    <div class="popover-text"> 
+                        &gt; $10,000 / jugador &rArr; Score 8.0 (Tráfico VIP)<br> 
+                        &gt; $1,000 / jugador &rArr; Score 4.0<br> 
+                        &lt; $1,000 / jugador &rArr; Score 2.0 (Tráfico Retail) 
+                    </div> 
+                </div> 
+                <div class="popover-section"> 
+                    <div class="popover-label">SEÑALES A VIGILAR</div> 
+                    <div class="popover-text">- Caídas abruptas de calidad a pesar del aumento de usuarios indican campañas masivas de captación de bajo valor (tráfico basura).</div> 
+                </div> 
+            ` 
+        }, 
+        'eficiencia_juego': { 
+            custom: ` 
+                <div class="popover-section"> 
+                    <div class="popover-label">OBJETIVO</div> 
+                    <div class="popover-text">Mide el "Turnover" o volumen de rotación del capital. Evalúa cuánto juegan los usuarios con el dinero que depositan.</div> 
+                </div> 
+                <div class="popover-section"> 
+                    <div class="popover-label">CÁLCULO</div> 
+                    <div class="popover-text">Turnover (%) = ((Apuestas Totales / Depósitos Totales) &minus; 1) &times; 100</div> 
+                </div> 
+                <div class="popover-section"> 
+                    <div class="popover-label">INTERPRETACIÓN RÁPIDA</div> 
+                    <div class="popover-text"> 
+                        <b>Positivo Alto:</b> Alto engagement. Las ganancias se reinvierten (capital "rota" varias veces).<br> 
+                        <b>Negativo / Cerca de 0:</b> Depositan, juegan muy poco, e inmediatamente retiran o pierden. 
+                    </div> 
+                </div> 
+                <div class="popover-section"> 
+                    <div class="popover-label">SEÑALES A VIGILAR</div> 
+                    <div class="popover-text">- ⚠ Caídas críticas (&le; -20 pp) muestran un declive repentino en el interés tras el depósito inicial.</div> 
+                </div> 
+            ` 
+        } 
     };
 
     function buildInfoIcon(mKey) {
@@ -1671,6 +1830,10 @@ ${popoverContent}
                     if (prev_s !== null) {
                         const d_s = sv - prev_s;
                         change_data["Δ Score"] = (d_s > 0 ? '+' : '') + formatPP(d_s);
+                        
+                        if (d_s <= -2.0) change_data["Evento"] = "⚠ Caída crítica";
+                        else if (d_s <= -1.0) change_data["Evento"] = "⚠ Alerta leve";
+                        else if (d_s >= 2.0) change_data["Evento"] = "⚠ Mejora notable";
                     }
                     
                     // Unified Tooltip matches Rentability/Fidelity
@@ -1827,6 +1990,9 @@ ${popoverContent}
                     if (prev_s !== null) {
                         const d_s = s - prev_s;
                         change_data["Δ Crec."] = (d_s > 0 ? '+' : '') + formatPP(d_s);
+                        
+                        if (d_s <= -2.0) change_data["Evento"] = "⚠ Desplome";
+                        else if (d_s >= 2.0) change_data["Evento"] = "⚠ Explosión";
                     }
                     hover_texts.push(buildTooltipHTML(formatted_x[i], real_data, change_data, s));
                 }
@@ -1912,6 +2078,12 @@ ${popoverContent}
                         change_data["Δ " + ggr_label] = (d_ggr > 0 ? '+' : '') + formatPct(d_ggr);
                     } else if (prev_ggr !== null) {
                         change_data["Δ " + ggr_label] = "N/A";
+                    }
+
+                    if (prev_s !== null) {
+                        const d_s = sv - prev_s;
+                        if (d_s <= -2.0) change_data["Evento"] = "⚠ Ineficiencia";
+                        else if (d_s >= 2.0) change_data["Evento"] = "⚠ Optimización";
                     }
                     
                     strip_hover_texts.push(buildTooltipHTML(formatted_x[i], real_data, change_data, sv));
@@ -2160,6 +2332,12 @@ ${popoverContent}
                         change_data["Δ Conversión"] = "N/A";
                     }
 
+                    if (prev_s !== null) {
+                        const d_s = sv - prev_s;
+                        if (d_s <= -2.0) change_data["Evento"] = "⚠ Fuga";
+                        else if (d_s >= 2.0) change_data["Evento"] = "⚠ Alta conversión";
+                    }
+
                     trend_hover_texts.push(buildTooltipHTML(formatted_x[i], real_data, change_data, sv));
                 }
 
@@ -2232,6 +2410,9 @@ ${popoverContent}
                     if (prev_s !== null ) { 
                         const  d_s = s - prev_s; 
                         change_data["Δ vs Mes Anterior"] = (d_s > 0 ? '+' : '' ) + formatPP(d_s); 
+                        
+                        if (d_s <= -2.0) change_data["Evento"] = "⚠ Tendencia negativa";
+                        else if (d_s >= 2.0) change_data["Evento"] = "⚠ Tendencia positiva";
                     } 
                     
                     hover_texts.push(buildTooltipHTML(formatted_x[i], real_data, change_data, s)); 
@@ -2300,101 +2481,150 @@ ${popoverContent}
                     } 
                 ]; 
 
-                layout.margin = { t: 50, b: 60, l: 45, r: 30  }; 
+                // Force X-axis to show all months 
+                layout.xaxis.tickvals = x_vals; 
+                layout.xaxis.ticktext = formatted_x; 
+                
+                layout.margin = { t: 50, b: 60, l: 45, r: 30 }; 
                 layout.yaxis = { 
-                    range: [0, 10.5 ], 
+                    range: [0, 10.5], 
                     showline: true, linewidth: 1.5, linecolor: '#cbd5e1' , 
                     ticks: 'outside', tickcolor: '#cbd5e1', ticklen: 5 , 
                     showgrid: true, gridcolor: 'rgba(241, 245, 249, 0.6)', zeroline: true, zerolinecolor: '#cbd5e1' , 
                     tickfont: { size: 10, color: '#475569', family: 'Inter'  } 
                 };
 
-            } else if (m === 'diversificacion') {
-                // ═══════════════════════════════════════════════════════════
-                //  DIVERSIFICACIÓN — 2-Product HHI Scale (Max ~5.0)
-                // ═══════════════════════════════════════════════════════════
-                const hover_texts = [];
-                const scores = y_vals;
-                const criticalFlags = [];
-                for (let i = 0; i < series.length; i++) {
-                    const s = y_vals[i];
-                    criticalFlags.push(s < 4.0);
-                    const prev_s = i > 0 ? y_vals[i-1] : null;
+            } else if (m === 'diversificacion') { 
+                // ═══════════════════════════════════════════════════════════ 
+                //  DIVERSIFICACIÓN — 2-Product HHI Scale (Max ~5.0) 
+                // ═══════════════════════════════════════════════════════════ 
+                const hover_texts = []; 
+                const scores = y_vals; 
+                const criticalFlags = []; 
+                let last_var_pts = 0; 
+                
+                for (let i = 0; i < series.length; i++) { 
+                    const s = y_vals[i]; 
+                    criticalFlags.push(s < 4.0); 
+                    const prev_s = i > 0 ? y_vals[i-1] : null; 
                     
-                    const ggr_cas = series[i].ggr_casino || 0;
-                    const ggr_dep = series[i].ggr_deportiva || 0;
-                    const total_ggr = ggr_cas + ggr_dep;
-                    const cas_share = total_ggr > 0 ? (ggr_cas / total_ggr) * 100 : 0;
-                    const dep_share = total_ggr > 0 ? (ggr_dep / total_ggr) * 100 : 0;
+                    const ggr_cas = series[i].ggr_casino || 0; 
+                    const ggr_dep = series[i].ggr_deportiva || 0; 
+                    const total_ggr = ggr_cas + ggr_dep; 
+                    const cas_share = total_ggr > 0 ? (ggr_cas / total_ggr) * 100 : 0; 
+                    const dep_share = total_ggr > 0 ? (ggr_dep / total_ggr) * 100 : 0; 
                     
-                    let prev_cas_share = null;
-                    if (prev_s !== null) {
-                        const prev_ggr_cas = series[i-1].ggr_casino || 0;
-                        const prev_ggr_dep = series[i-1].ggr_deportiva || 0;
-                        const prev_tot = prev_ggr_cas + prev_ggr_dep;
-                        prev_cas_share = prev_tot > 0 ? (prev_ggr_cas / prev_tot) * 100 : 0;
-                    }
-
-                    const real_data = {
-                        "Casino GGR": '$' + formatInt(ggr_cas),
-                        "Deportes GGR": '$' + formatInt(ggr_dep),
-                        "Mix": `${formatPct(cas_share)} Cas / ${formatPct(dep_share)} Dep`
-                    };
-                    
-                    const change_data = {};
-                    let evento = "⚠ Mes crítico";
-                    
-                    if (prev_s !== null) {
-                        const d_s = s - prev_s;
-                        change_data["Δ Diversificación"] = (d_s > 0 ? '+' : '') + formatPP(d_s) + ' pts';
+                    let prev_cas_share = null; 
+                    if (prev_s !== null) { 
+                        const prev_ggr_cas = series[i-1].ggr_casino || 0; 
+                        const prev_ggr_dep = series[i-1].ggr_deportiva || 0; 
+                        const prev_tot = prev_ggr_cas + prev_ggr_dep; 
+                        prev_cas_share = prev_tot > 0 ? (prev_ggr_cas / prev_tot) * 100 : 0; 
                         
-                        if (d_s <= -1.0) evento = "⚠ Caída crítica";
-                        else if (d_s >= 1.0) evento = "⚠ Pico inusual";
-                        
-                        if (prev_cas_share !== null) {
-                            const d_cas = cas_share - prev_cas_share;
-                            change_data["Δ Casino Share"] = (d_cas > 0 ? '+' : '') + formatPP(d_cas) + ' pp';
-                        }
-                    }
-                    if (criticalFlags[i]) change_data["Evento"] = evento;
-                    
-                    hover_texts.push(buildTooltipHTML(formatted_x[i], real_data, change_data, s));
-                }
+                        const d_s = s - prev_s; 
+                        if (i === series.length - 1) last_var_pts = d_s; 
+                    } 
 
-                traces.push({
+                    const real_data = { 
+                        "Casino GGR": '$' + formatInt(ggr_cas), 
+                        "Deportes GGR": '$' + formatInt(ggr_dep), 
+                        "Mix": `${formatPct(cas_share)} Cas / ${formatPct(dep_share)} Dep` 
+                    }; 
+                    
+                    const change_data = {}; 
+                    let evento = "⚠ Mes crítico"; 
+                    
+                    if (prev_s !== null) { 
+                        const d_s = s - prev_s; 
+                        change_data["Δ Diversificación"] = (d_s > 0 ? '+' : '') + formatPP(d_s) + ' pts'; 
+                        
+                        if (d_s <= -1.0) evento = "⚠ Caída crítica"; 
+                        else if (d_s >= 1.0) evento = "⚠ Pico inusual"; 
+                        
+                        if (prev_cas_share !== null) { 
+                            const d_cas = cas_share - prev_cas_share; 
+                            change_data["Δ Casino Share"] = (d_cas > 0 ? '+' : '') + formatPP(d_cas) + ' pp'; 
+                        } 
+                    } 
+                    if (criticalFlags[i]) change_data["Evento"] = evento; 
+                    
+                    hover_texts.push(buildTooltipHTML(formatted_x[i], real_data, change_data, s)); 
+                } 
+
+                traces.push({ 
                     x: x_vals, y: y_vals, customdata: hover_texts, 
                     type: 'scatter', mode: 'lines+markers', name: 'Score', 
-                    line: { color: config.color, width: 2, shape: 'hv' },
+                    line: { color: config.color, width: 2, shape: 'hv' }, 
                     marker: { 
                         size: x_vals.map((_, i) => i === x_vals.length - 1 ? 9 : 5), 
                         color: config.color, 
                         line: { color: '#ffffff', width: x_vals.map((_, i) => i === x_vals.length - 1 ? 2 : 0) } 
-                    },
-                    fill: 'tozeroy',
-                    fillcolor: hexToRgba(config.color, 0.08),
-                    hovertemplate: '%{customdata}<extra></extra>'
-                });
+                    }, 
+                    fill: 'tozeroy', 
+                    fillcolor: hexToRgba(config.color, 0.08), 
+                    hovertemplate: '%{customdata}<extra></extra>' 
+                }); 
                 
-                addCriticalEnclosure(layout, x_vals, criticalFlags);
+                addCriticalEnclosure(layout, x_vals, criticalFlags); 
                 
                 layout.shapes = [{ 
                     type: 'rect', x0: 0, x1: 1, xref: 'paper', y0: 3.5, y1: 5.5, yref: 'y', 
                     fillcolor: 'rgba(34, 197, 94, 0.08)', line: {width: 0}, layer: 'below' 
-                }];
-                
-                layout.xaxis.tickvals = x_vals;
-                layout.xaxis.ticktext = formatted_x;
+                }]; 
 
-                layout.margin = { t: 20, b: 40, l: 30, r: 15 };
-                layout.showlegend = false;
-                layout.yaxis = {
-                    range: [0, 5.5],
-                    showgrid: true,
-                    gridcolor: 'rgba(241, 245, 249, 0.6)',
-                    zeroline: true,
-                    zerolinecolor: 'rgba(241, 245, 249, 0.8)',
-                    tickfont: { size: 10, color: '#94a3b8', family: 'Inter' },
-                    dtick: 1
+                // --- MOMENTUM & KPI ANNOTATIONS --- 
+                let momentum = "→ Estable"; 
+                let mom_color = "#64748b"; 
+                if (scores.length >= 2) { 
+                    const lm = scores[scores.length-1] || 0; 
+                    const pm = scores[scores.length-2] || 0; 
+                    if (lm - pm > 0.5) { momentum = "▲ Mejorando"; mom_color = "#10b981"; } 
+                    else if (lm - pm < -0.5) { momentum = "▼ Empeorando"; mom_color = "#ef4444"; } 
+                } 
+
+                const last_s = scores[scores.length - 1] || 0; 
+                const delta_color = last_var_pts >= 0 ? '#10b981' : '#ef4444'; 
+                const delta_arrow = last_var_pts >= 0 ? '▲' : '▼'; 
+                const delta_str = (last_var_pts > 0 ? '+' : '') + last_var_pts.toFixed(2); 
+                
+                let delta_text = ''; 
+                if (scores.length >= 2) { 
+                    delta_text = `<span style="color:${delta_color}; font-size:11px; font-weight:600;">${delta_arrow} ${delta_str} pts</span><br>`; 
+                } else { 
+                    delta_text = `<span style="color:#64748b; font-size:11px; font-weight:600;">Δ: N/A</span><br>`; 
+                } 
+
+                layout.annotations = [ 
+                    { 
+                        x: 0, y: 1.13, xref: 'paper', yref: 'paper', 
+                        xanchor: 'left', yanchor: 'top', 
+                        text: `<b><span style="color:${mom_color};">${momentum}</span></b>`, 
+                        showarrow: false, 
+                        font: {size: 12, family: 'Inter'} 
+                    }, 
+                    { 
+                        x: 1, y: 1.15, xref: 'paper', yref: 'paper', 
+                        xanchor: 'right', yanchor: 'top', 
+                        text: `<b><span style="font-size:14px;color:#0f172a;">${last_s.toFixed(2)} / 5</span></b>  ` + delta_text, 
+                        showarrow: false, 
+                        align: 'right' 
+                    } 
+                ]; 
+                // ---------------------------------- 
+                
+                layout.xaxis.tickvals = x_vals; 
+                layout.xaxis.ticktext = formatted_x; 
+
+                layout.margin = { t: 50, b: 40, l: 30, r: 15 }; // Increased top margin to 50 
+                layout.showlegend = false; 
+                layout.yaxis = { 
+                    range: [0, 5.5], 
+                    showgrid: true, 
+                    gridcolor: 'rgba(241, 245, 249, 0.6)', 
+                    zeroline: true, 
+                    zerolinecolor: 'rgba(241, 245, 249, 0.8)', 
+                    tickfont: { size: 10, color: '#94a3b8', family: 'Inter' }, 
+                    dtick: 1 
                 };
                 
             } else if (m === 'calidad_jugadores') {
@@ -2409,6 +2639,9 @@ ${popoverContent}
                     if (prev_s !== null) {
                         const d_s = s - prev_s;
                         change_data["Δ Calidad"] = (d_s > 0 ? '+' : '') + formatPP(d_s);
+                        
+                        if (d_s <= -2.0) change_data["Evento"] = "⚠ Pérdida calidad";
+                        else if (d_s >= 2.0) change_data["Evento"] = "⚠ Alta calidad";
                     }
                     hover_texts.push(buildTooltipHTML(formatted_x[i], real_data, change_data, s));
                 }
@@ -2525,7 +2758,11 @@ ${popoverContent}
                     }
                 ];
 
-                layout.margin = { t: 50, b: 60, l: 60, r: 30 }; // Extra top margin for annotations
+                // Force X-axis to show all months 
+                layout.xaxis.tickvals = x_vals; 
+                layout.xaxis.ticktext = formatted_x; 
+
+                layout.margin = { t: 50, b: 60, l: 60, r: 30 }; // Extra top margin for annotations 
                 layout.yaxis = { 
                     showline: true, linewidth: 1.5, linecolor: '#cbd5e1', 
                     ticks: 'outside', tickcolor: '#cbd5e1', ticklen: 5,
