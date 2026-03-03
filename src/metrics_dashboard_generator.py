@@ -193,10 +193,10 @@ def generate_metrics_dashboard(monthly_dict, out_path="reports/metrics_historic_
         'rentabilidad': {'title': 'Rentabilidad', 'color': '#0F62FE'},            # Royal Blue
         'volumen':                {'title': 'Volumen Transaccional',        'color': '#2563EB'},
         'fidelidad':              {'title': 'Fidelidad de Jugadores',      'color': '#2563EB'},
-        'estabilidad': {'title': 'Estabilidad Financiera', 'color': '#5C4033'},   # Café Intenso unificado
+        'estabilidad': {'title': 'Estabilidad Financiera', 'color': '#0e7490'},   # Café Intenso unificado
         'crecimiento': {'title': 'Crecimiento de Captación', 'color': '#0072C3'}, # Deep Sky Blue
-        'eficiencia_casino': {'title': 'Eficiencia Casino', 'color': '#5C4033'},  # Café Intenso unificado
-        'eficiencia_deportes': {'title': 'Eficiencia Deportes', 'color': '#5C4033'}, # Café Intenso unificado
+        'eficiencia_casino': {'title': 'Eficiencia Casino', 'color': '#0e7490'},  # Café Intenso unificado
+        'eficiencia_deportes': {'title': 'Eficiencia Deportes', 'color': '#0e7490'}, # Café Intenso unificado
         'eficiencia_conversion':  {'title': 'Eficiencia de Conversión',     'color': '#2563EB'},
         'tendencia':              {'title': 'Tendencia Histórica',          'color': '#2563EB'},
         'diversificacion':        {'title': 'Diversificación de Productos', 'color': '#2563EB'},
@@ -1477,7 +1477,7 @@ ${popoverContent}
                 // LAYER A1: Lollipop Stems
                 traces.push({
                     x: stems_x, y: stems_y, type: 'scatter', mode: 'lines',
-                    line: { color: 'rgba(16, 185, 129, 0.4)', width: 4 }, 
+                    line: { color: 'rgba(0, 102, 0, 0.55)', width: 4 }, 
                     hoverinfo: 'skip', showlegend: false
                 });
 
@@ -1485,7 +1485,7 @@ ${popoverContent}
                 traces.push({
                     x: x_vals, y: txs, type: 'scatter', mode: 'markers',
                     name: 'Transacciones',
-                    marker: { size: 12, color: '#10b981', line: {color: '#ffffff', width: 2} },
+                    marker: { size: 12, color: '#006600', line: {color: '#ffffff', width: 2} },
                     customdata: hover_texts,
                     hovertemplate: '%{customdata}<extra></extra>'
                 });
@@ -1668,17 +1668,17 @@ ${popoverContent}
                     type: 'scatter', mode: 'lines+markers',
                     name: 'Share %',
                     line: {
-                        color: config.color,
+                        color: '#1d4ed8',
                         shape: 'linear',   // Executive clarity over spline
                         width: 3
                     },
                     marker: {
                         size: markerSizes,
-                        color: config.color,
+                        color: '#1d4ed8',
                         line: { color: '#ffffff', width: 2 }
                     },
                     fill: 'tozeroy',
-                    fillcolor: hexToRgba(config.color, 0.15),
+                    fillcolor: 'rgba(29, 78, 216, 0.15)',
                     customdata: hover_texts,
                     hovertemplate: '%{customdata}<extra></extra>'
                 });
@@ -2439,7 +2439,7 @@ ${popoverContent}
                             tickfont: { size: 10, color: '#64748b', family: 'Inter' },
                             tickwidth: 1, tickcolor: '#cbd5e1'
                         },
-                        bar: { color: config.color, thickness: 0.25 },
+                        bar: { color: '#1d4ed8', thickness: 0.25 },
                         bgcolor: "rgba(0,0,0,0)",
                         borderwidth: 0,
                         bordercolor: "transparent",
@@ -2465,7 +2465,7 @@ ${popoverContent}
                     
                     if (diff > 0) { 
                         momentum = "▲ Mejorando"; 
-                        mom_color = config.color; 
+                        mom_color = '#1d4ed8'; 
                     } else if (diff < 0) { 
                         momentum = "▼ En Baja"; 
                         mom_color = "#64748b";    
@@ -2478,7 +2478,7 @@ ${popoverContent}
                     const delta_str = (diff > 0 ? '+' : '') + diff.toFixed(2) + ' pts';
                     const delta_arrow = diff > 0 ? '▲' : (diff < 0 ? '▼' : '→');
                     
-                    const delta_color = (last_val < 0) ? '#FF0000' : (diff > 0 ? config.color : '#64748b');
+                    const delta_color = (last_val < 0) ? '#FF0000' : (diff > 0 ? '#1d4ed8' : '#64748b');
                     delta_text = `<span style="color:${delta_color}; font-size:11px; font-weight:700;">${delta_arrow} ${delta_str}</span>`;
                 }
                 
@@ -2576,14 +2576,14 @@ ${popoverContent}
                     customdata: trend_hover_texts,
                     type: 'scatter',
                     mode: 'lines+markers',
-                    line: { color: config.color, width: 2, shape: 'linear' },
+                    line: { color: '#1d4ed8', width: 2, shape: 'linear' },
                     marker: {
                         size: x_vals.map((_, i) => i === x_vals.length - 1 ? 8 : 4),
-                        color: config.color,
+                        color: '#1d4ed8',
                         line: { color: '#ffffff', width: x_vals.map((_, i) => i === x_vals.length - 1 ? 1.5 : 0) }
                     },
                     fill: 'tozeroy',
-                    fillcolor: hexToRgba(config.color, 0.15),
+                    fillcolor: 'rgba(29, 78, 216, 0.15)',
                     connectgaps: true,
                     cliponaxis: false,
                     hovertemplate: '%{customdata}<extra></extra>'
@@ -2663,14 +2663,14 @@ ${popoverContent}
                     type: 'scatter' , 
                     mode: 'lines+markers' , 
                     name: 'Score Mensual' , 
-                    line: { color: config.color, width: 3, shape: 'spline'  }, 
+                    line: { color: '#1d4ed8', width: 3, shape: 'spline'  }, 
                     marker : { 
                         size: x_vals.map((_, i) => i === x_vals.length - 1 ? 10 : 6 ), 
-                        color : config.color, 
+                        color : '#1d4ed8', 
                         line: { color: '#ffffff', width: x_vals.map((_, i) => i === x_vals.length - 1 ? 2 : 1 ) } 
                     }, 
                     fill: 'tozeroy' , 
-                    fillcolor: hexToRgba(config.color, 0.15), 
+                    fillcolor: 'rgba(29, 78, 216, 0.15)', 
                     hovertemplate: '%{customdata}<extra></extra>' 
                 }); 
 
@@ -2813,14 +2813,14 @@ ${popoverContent}
                 traces.push({ 
                     x: x_vals, y: y_vals, customdata: hover_texts, 
                     type: 'scatter', mode: 'lines+markers', name: 'Score', 
-                    line: { color: config.color, width: 2, shape: 'hv' }, 
+                    line: { color: '#1d4ed8', width: 2, shape: 'hv' }, 
                     marker: { 
                         size: x_vals.map((_, i) => i === x_vals.length - 1 ? 9 : 5), 
-                        color: config.color, 
+                        color: '#1d4ed8', 
                         line: { color: '#ffffff', width: x_vals.map((_, i) => i === x_vals.length - 1 ? 2 : 0) } 
                     }, 
                     fill: 'tozeroy', 
-                    fillcolor: hexToRgba(config.color, 0.15), 
+                    fillcolor: 'rgba(29, 78, 216, 0.15)', 
                     hovertemplate: '%{customdata}<extra></extra>' 
                 }); 
                 
