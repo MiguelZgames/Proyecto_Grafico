@@ -189,20 +189,21 @@ def generate_metrics_dashboard(monthly_dict, out_path="reports/metrics_historic_
     # We use a JS object to define the chart titles, descriptions and colors, 
     # to maintain visual consistency with the main dashboard.
     
-    chart_config = { 
-        'rentabilidad': {'title': 'Rentabilidad', 'color': '#1d4ed8'},            # Blue 700 
-        'volumen': {'title': 'Volumen Transaccional', 'color': '#047857'},        # Emerald 700 
-        'fidelidad': {'title': 'Fidelidad de Jugadores', 'color': '#7e22ce'},     # Purple 700 
-        'estabilidad': {'title': 'Estabilidad', 'color': '#ea580c'},              # Orange 600 
-        'crecimiento': {'title': 'Crecimiento', 'color': '#0369a1'},              # Sky 700 
-        'eficiencia_casino': {'title': 'Eficiencia Casino', 'color': '#be185d'},  # Pink 700 
-        'eficiencia_deportes': {'title': 'Eficiencia Deportes', 'color': '#c2410c'}, # Orange 700 
-        'eficiencia_conversion': {'title': 'Eficiencia de Conversión', 'color': '#0f766e'}, # Teal 700 
-        'tendencia': {'title': 'Tendencia Histórica', 'color': '#4338ca'},        # Indigo 700 
-        'diversificacion': {'title': 'Diversificación de Productos', 'color': '#a21caf'}, # Fuchsia 700 
-        'calidad_jugadores': {'title': 'Calidad de Jugadores', 'color': '#0e7490'}, # Cyan 700 
-        'eficiencia_juego': {'title': 'Eficiencia de Juego', 'color': '#6d28d9'}  # Violet 700 
+    chart_config = {
+        'rentabilidad': {'title': 'Rentabilidad', 'color': '#0F62FE'},            # Royal Blue
+        'volumen':                {'title': 'Volumen Transaccional',        'color': '#2563EB'},
+        'fidelidad':              {'title': 'Fidelidad de Jugadores',      'color': '#2563EB'},
+        'estabilidad': {'title': 'Estabilidad Financiera', 'color': '#5C4033'},   # Café Intenso unificado
+        'crecimiento': {'title': 'Crecimiento de Captación', 'color': '#0072C3'}, # Deep Sky Blue
+        'eficiencia_casino': {'title': 'Eficiencia Casino', 'color': '#5C4033'},  # Café Intenso unificado
+        'eficiencia_deportes': {'title': 'Eficiencia Deportes', 'color': '#5C4033'}, # Café Intenso unificado
+        'eficiencia_conversion':  {'title': 'Eficiencia de Conversión',     'color': '#2563EB'},
+        'tendencia':              {'title': 'Tendencia Histórica',          'color': '#2563EB'},
+        'diversificacion':        {'title': 'Diversificación de Productos', 'color': '#2563EB'},
+        'calidad_jugadores': {'title': 'Calidad de Jugadores', 'color': '#001D6C'}, # Navy Contrast
+        'eficiencia_juego': {'title': 'Eficiencia de Juego (Turnover)', 'color': '#6929C4'}  # Deep Violet
     }
+
     config_json = json.dumps(chart_config)
     
     # Extract agent list to populate the select dropdown
@@ -1109,7 +1110,7 @@ ${popoverContent}
                         xref: 'paper', yref: 'paper',
                         y0: 0, y1: 1,
                         layer: 'below',
-                        fillcolor: 'rgba(239,68,68,0.06)',
+                        fillcolor: 'rgba(239,68,68,0.08)',
                         line: { color: 'rgba(239,68,68,0.22)', width: 1 },
                         x0: (i - 0.5) / n, x1: (i + 0.5) / n
                     });
@@ -1200,11 +1201,12 @@ ${popoverContent}
                     
                     const isLast = (i === series.length - 1);
                     
-                    // High-contrast Color Logic
-                    let color = '#475569'; // neutral
-                    if (m_pct === null) color = '#cbd5e1';
-                    else if (m_pct < 0) color = '#ef4444'; // Red
-                    else if (m_pct > 10) color = '#10b981'; // Green
+                    // High-contrast Color Logic — harmonized with bar palette
+                    let color = '#64748b'; // neutral
+                    if (m_pct === null)  color = '#cbd5e1';
+                    else if (m_pct < 0)  color = '#FF0000'; // Rojo puro
+                    else if (m_pct < 5)  color = '#d97706'; // Ámbar
+                    else if (m_pct >= 10) color = '#006600'; // Verde oscuro
                     
                     margin_colors.push(color);
                     margin_sizes.push(isLast ? 14 : 8);
@@ -1252,37 +1254,25 @@ ${popoverContent}
                     const h_text = buildTooltipHTML(formatted_x[i], real_data, change_data, s);
                     hover_texts.push(h_text);
                     
-                    // Bar Conditional Colors (Reduced Opacity)
-                    let b_fill = 'rgba(148, 163, 184, 0.15)'; // Neutral (5-10%)
-                    let b_line = 'rgba(148, 163, 184, 0.5)';
+                    // Bar Conditional Colors — same intensity as Eficiencia de Juego
+                    let b_fill = '#64748b'; // Neutral (5-10%) — Slate
+                    let b_line = '#64748b';
                     if (m_pct !== null) {
-                        if (m_pct < 0) {
-                            b_fill = 'rgba(239, 68, 68, 0.15)'; b_line = 'rgba(239, 68, 68, 0.5)';
-                        } else if (m_pct < 5) {
-                            b_fill = 'rgba(245, 158, 11, 0.15)'; b_line = 'rgba(245, 158, 11, 0.5)';
-                        } else if (m_pct >= 10) {
-                            b_fill = 'rgba(16, 185, 129, 0.15)'; b_line = 'rgba(16, 185, 129, 0.5)';
-                        }
+                        if (m_pct < 0)    { b_fill = '#FF0000'; b_line = '#FF0000'; } // Rojo puro — igual que Eficiencia
+                        else if (m_pct < 5)  { b_fill = '#d97706'; b_line = '#d97706'; } // Ámbar armónico
+                        else if (m_pct >= 10){ b_fill = '#006600'; b_line = '#006600'; } // Verde oscuro — igual que Eficiencia
                     }
                     bar_fill_colors.push(b_fill);
                     bar_line_colors.push(b_line);
                 }
 
-                // Momentum calculation
-                let momentum = "→ Estable";
-                let mom_color = "#64748b";
-                if (margins.length >= 2) {
-                    const lm = margins[margins.length-1] || 0;
-                    const pm = margins[margins.length-2] || 0;
-                    if (lm - pm > 1) { momentum = "▲ Mejorando"; mom_color = "#10b981"; }
-                    else if (lm - pm < -1) { momentum = "▼ Empeorando"; mom_color = "#ef4444"; }
-                }
+                // Momentum calculation logic is standardized separately now
 
                 // LAYER A: Volume Context (Left Axis, conditionally colored bordered bars)
                 traces.push({
                     x: x_vals, y: deps, type: 'bar',
-                    name: 'Volumen', 
-                    marker: { color: bar_fill_colors, line: {color: bar_line_colors, width: 1.5} },
+                    name: 'Volumen',
+                    marker: { color: bar_fill_colors, line: { width: 0 }, cornerradius: 4 },
                     customdata: hover_texts,
                     hovertemplate: '%{customdata}<extra></extra>'
                 });
@@ -1310,7 +1300,7 @@ ${popoverContent}
                     traces.push({
                         x: anomalies_x, y: anomalies_y, type: 'scatter', mode: 'markers', yaxis: 'y2',
                         name: 'Anomalías', 
-                        marker: { symbol: anomalies_symbols, size: 14, color: 'rgba(0,0,0,0)', line: {color:'rgba(239,68,68,0.8)', width: 2} },
+                        marker: { symbol: anomalies_symbols, size: 14, color: '#FF0000', line: {color: '#ffffff', width: 1.5} },
                         hoverinfo: 'skip'
                     });
                 }
@@ -1354,30 +1344,47 @@ ${popoverContent}
                 
                 // Subtle Background Zones & Thresholds (Reduced opacity)
                 layout.shapes = [
-                    { type: 'rect', x0: 0, x1: 1, xref: 'paper', y0: -100, y1: 0, yref: 'y2', fillcolor: 'rgba(239, 68, 68, 0.02)', line: {width: 0}, layer: 'below' }, 
-                    { type: 'rect', x0: 0, x1: 1, xref: 'paper', y0: 0, y1: 5, yref: 'y2', fillcolor: 'rgba(245, 158, 11, 0.02)', line: {width: 0}, layer: 'below' }, 
-                    { type: 'rect', x0: 0, x1: 1, xref: 'paper', y0: 10, y1: 100, yref: 'y2', fillcolor: 'rgba(16, 185, 129, 0.02)', line: {width: 0}, layer: 'below' }, 
-                    
                     { type: 'line', x0: 0, x1: 1, xref: 'paper', y0: 0, y1: 0, yref: 'y2', line: { color: '#94a3b8', width: 1.5 } }, 
                     { type: 'line', x0: 0, x1: 1, xref: 'paper', y0: 5, y1: 5, yref: 'y2', line: { color: '#cbd5e1', width: 1, dash: 'dash' } }, 
                     { type: 'line', x0: 0, x1: 1, xref: 'paper', y0: 10, y1: 10, yref: 'y2', line: { color: 'rgba(16, 185, 129, 0.4)', width: 1, dash: 'dash' } }, 
                     { type: 'line', x0: 0, x1: 1, xref: 'paper', y0: 15, y1: 15, yref: 'y2', line: { color: 'rgba(16, 185, 129, 0.4)', width: 1, dash: 'dot' } }
                 ];
                 
-                const last_m = margins[margins.length-1];
-                const prev_m = margins.length >= 2 ? margins[margins.length-2] : null;
-                const last_m_txt = (last_m !== null && last_m !== undefined) ? last_m.toFixed(1)+'%' : 'N/A';
-                
-                let delta_pp_text = '';
-                if (last_m !== null && last_m !== undefined && prev_m !== null && prev_m !== undefined) {
-                    const delta_pp = last_m - prev_m;
-                    const delta_color = delta_pp >= 0 ? '#10b981' : '#ef4444';
-                    const delta_arrow = delta_pp >= 0 ? '▲' : '▼';
-                    const delta_str = (delta_pp > 0 ? '+' : '') + delta_pp.toFixed(2);
-                    delta_pp_text = `<span style="color:${delta_color}; font-size:11px; font-weight:600;">${delta_arrow} ${delta_str} pp</span><br>`;
+                // ── MOMENTUM & KPI ANNOTATIONS (STANDARDIZED) ──────────────────────────
+                const last_val = margins[margins.length - 1] ?? 0;
+                const prev_val = margins.length >= 2 ? margins[margins.length - 2] : null;
+
+                let momentum  = "→ Estable";
+                let mom_color = "#94a3b8";
+                let delta_text = `<span style="color:#94a3b8;font-size:11px;font-weight:700;">Δ: N/A</span>`;
+
+                if (prev_val !== null) {
+                    const diff = last_val - prev_val;
+
+                    if (diff > 0) {
+                        momentum  = "▲ Mejorando";
+                        mom_color = "#22c55e";
+                    } else if (diff < 0) {
+                        if (last_val < 0) {
+                            momentum  = "▼ Empeorando";
+                            mom_color = "#FF0000";
+                        } else {
+                            momentum  = "▼ En Baja";
+                            mom_color = "#94a3b8";
+                        }
+                    }
+
+                    const delta_str   = (diff > 0 ? '+' : '') + diff.toFixed(2) + ' pp';
+                    const delta_arrow = diff > 0 ? '▲' : diff < 0 ? '▼' : '→';
+                    let   delta_color = "#94a3b8";
+                    if (diff > 0)               delta_color = "#22c55e";
+                    else if (diff < 0 && last_val < 0) delta_color = "#FF0000";
+
+                    delta_text = `<span style="color:${delta_color};font-size:11px;font-weight:700;">${delta_arrow} ${delta_str}</span>`;
                 }
 
                 const last_s = scores[scores.length - 1] || 0;
+                const fmt_val = (last_val !== null && last_val !== undefined) ? last_val.toFixed(1) + '%' : 'N/A';
 
                 layout.annotations = [
                     {
@@ -1385,18 +1392,20 @@ ${popoverContent}
                         xanchor: 'left', yanchor: 'top',
                         text: `<b><span style="color:${mom_color};">${momentum}</span></b>`,
                         showarrow: false,
-                        font: {size: 12, family: 'Inter'}
+                        font: { size: 12, family: 'Inter' }
                     },
                     {
                         x: 1, y: 1.15, xref: 'paper', yref: 'paper',
                         xanchor: 'right', yanchor: 'top',
-                        text: `<b><span style="font-size:14px;color:#0f172a;">${last_m_txt}</span></b>  ` +
-                              delta_pp_text +
+                        text: `<b><span style="font-size:14px;color:${last_val < 0 ? '#FF0000' : '#0f172a'};">` +
+                              fmt_val +
+                              `</span></b>  ${delta_text}<br>` +
                               `<span style="font-size:10px; color:#64748b;">Score: ${last_s.toFixed(1)}/10</span>`,
                         showarrow: false,
                         align: 'right'
                     }
                 ];
+                // ────────────────────────────────────────────────────────────────────────
 
                 layout.showlegend = false; 
                 layout.margin.l = 50; 
@@ -1520,50 +1529,62 @@ ${popoverContent}
                     overlaying: 'y', side: 'right'
                 };
 
-                const last_t = txs[txs.length-1] || 0;
-                const prev_t = txs.length >= 2 ? txs[txs.length-2] : null;
-                const last_s = scores[scores.length-1] || 0;
-                
-                let delta_text = '';
-                if (prev_t !== null) {
-                    const delta = last_t - prev_t;
-                    const delta_pct = prev_t > 0 ? (delta / prev_t) * 100 : 0;
-                    const delta_color = delta >= 0 ? '#10b981' : '#ef4444';
-                    const delta_arrow = delta >= 0 ? '▲' : '▼';
-                    const delta_sign = delta > 0 ? '+' : '';
-                    
-                    delta_text = `<span style="color:${delta_color}; font-size:11px; font-weight:600;">${delta_arrow} ${delta_sign}${formatInt(delta)} (${delta_sign}${delta_pct.toFixed(1)}%)</span><br>`;
-                } else {
-                    delta_text = `<span style="color:#64748b; font-size:11px; font-weight:600;">Δ: N/A</span><br>`;
+                // ── MOMENTUM & KPI ANNOTATIONS (STANDARDIZED) ──────────────────────────
+                const last_val = txs[txs.length - 1] ?? 0;
+                const prev_val = txs.length >= 2 ? txs[txs.length - 2] : null;
+
+                let momentum  = "→ Estable";
+                let mom_color = "#94a3b8";
+                let delta_text = `<span style="color:#94a3b8;font-size:11px;font-weight:700;">Δ: N/A</span>`;
+
+                if (prev_val !== null) {
+                    const diff = last_val - prev_val;
+
+                    if (diff > 0) {
+                        momentum  = "▲ Mejorando";
+                        mom_color = "#22c55e";
+                    } else if (diff < 0) {
+                        if (last_val < 0) {
+                            momentum  = "▼ Empeorando";
+                            mom_color = "#FF0000";
+                        } else {
+                            momentum  = "▼ En Baja";
+                            mom_color = "#94a3b8";
+                        }
+                    }
+
+                    const delta_pct = prev_val > 0 ? (diff / prev_val) * 100 : 0;
+                    const delta_str = (diff > 0 ? '+' : '') + formatInt(diff) + ' (' + (diff > 0 ? '+' : '') + delta_pct.toFixed(1) + '%)';
+                    const delta_arrow = diff > 0 ? '▲' : diff < 0 ? '▼' : '→';
+                    let   delta_color = "#94a3b8";
+                    if (diff > 0)               delta_color = "#22c55e";
+                    else if (diff < 0 && last_val < 0) delta_color = "#FF0000";
+
+                    delta_text = `<span style="color:${delta_color};font-size:11px;font-weight:700;">${delta_arrow} ${delta_str}</span>`;
                 }
 
-                let momentum = "→ Estable";
-                let mom_color = "#64748b";
-                if (txs.length >= 2) {
-                    const lm = txs[txs.length-1] || 0;
-                    const pm = txs[txs.length-2] || 0;
-                    if (lm > pm) { momentum = "▲ Mejorando"; mom_color = "#10b981"; }
-                    else if (lm < pm) { momentum = "▼ Empeorando"; mom_color = "#ef4444"; }
-                }
-                
+                const last_s = scores[scores.length-1] || 0;
+
                 layout.annotations = [
                     {
                         x: 0, y: 1.13, xref: 'paper', yref: 'paper',
                         xanchor: 'left', yanchor: 'top',
                         text: `<b><span style="color:${mom_color};">${momentum}</span></b>`,
                         showarrow: false,
-                        font: {size: 12, family: 'Inter'}
+                        font: { size: 12, family: 'Inter' }
                     },
                     {
                         x: 1, y: 1.15, xref: 'paper', yref: 'paper',
                         xanchor: 'right', yanchor: 'top',
-                        text: `<b><span style="font-size:14px;color:#0f172a;">TXs: ${formatInt(last_t)}</span></b>  ` +
-                              delta_text +
+                        text: `<b><span style="font-size:14px;color:${last_val < 0 ? '#FF0000' : '#0f172a'};">` +
+                              `TXs: ${formatInt(last_val)}` +
+                              `</span></b>  ${delta_text}<br>` +
                               `<span style="font-size:10px; color:#64748b;">Score: ${last_s.toFixed(1)}/10</span>`,
                         showarrow: false,
                         align: 'right'
                     }
                 ];
+                // ────────────────────────────────────────────────────────────────────────
                 
             } else if (m === 'fidelidad') {
                 // ═══════════════════════════════════════════════════════════
@@ -1657,7 +1678,7 @@ ${popoverContent}
                         line: { color: '#ffffff', width: 2 }
                     },
                     fill: 'tozeroy',
-                    fillcolor: hexToRgba(config.color, 0.13),
+                    fillcolor: hexToRgba(config.color, 0.15),
                     customdata: hover_texts,
                     hovertemplate: '%{customdata}<extra></extra>'
                 });
@@ -1718,14 +1739,6 @@ ${popoverContent}
                 const band_lo = min_share;
                 const band_hi = max_share;
                 layout.shapes = [
-                    // Soft fill spanning the observed data range
-                    {
-                        type: 'rect', xref: 'paper',
-                        x0: 0, x1: 1,
-                        y0: band_lo, y1: band_hi, yref: 'y',
-                        fillcolor: hexToRgba(config.color, 0.04),
-                        line: { width: 0 }, layer: 'below'
-                    },
                     // Thin top-of-range reference line (previous month proxy)
                     {
                         type: 'line', xref: 'paper',
@@ -1737,48 +1750,65 @@ ${popoverContent}
                     }
                 ];
 
-                // ── Compact KPI annotation (top-right corner) ─────────────
-                const last_sh      = share_pct[share_pct.length - 1] || 0;
-                const last_s       = scores[scores.length - 1] || 0;
-                const delta_color  = last_sh_var_pp >= 0 ? '#10b981' : '#ef4444';
-                const delta_arrow  = last_sh_var_pp >= 0 ? '▲' : '▼';
-                const delta_abs    = (Math.abs(last_sh_var_pp) > 0 && Math.abs(last_sh_var_pp) < 1) ? 
-                                      Math.abs(last_sh_var_pp).toFixed(3) : 
-                                      Math.abs(last_sh_var_pp).toFixed(2);
+                // ── MOMENTUM & KPI ANNOTATIONS (STANDARDIZED) ──────────────────────────
+                const last_val = share_pct[share_pct.length - 1] ?? 0;
+                const prev_val = share_pct.length >= 2 ? share_pct[share_pct.length - 2] : null;
 
-                // Momentum label (3-month slope)
-                let momentum_label = '→ Estable';
-                let momentum_color = '#64748b';
-                if (share_pct.length >= 2) {
-                    const window = share_pct.slice(-Math.min(3, share_pct.length));
-                    const slope  = window[window.length - 1] - window[0];
-                    if (slope > 0.5)       { momentum_label = '▲ Mejorando';  momentum_color = '#10b981'; }
-                    else if (slope < -0.5) { momentum_label = '▼ Empeorando'; momentum_color = '#ef4444'; }
+                let momentum  = "→ Estable";
+                let mom_color = "#94a3b8";
+                let delta_text = `<span style="color:#94a3b8;font-size:11px;font-weight:700;">Δ: N/A</span>`;
+
+                if (prev_val !== null) {
+                    const diff = last_val - prev_val;
+
+                    if (diff > 0) {
+                        momentum  = "▲ Mejorando";
+                        mom_color = "#22c55e";
+                    } else if (diff < 0) {
+                        if (last_val < 0) {
+                            momentum  = "▼ Empeorando";
+                            mom_color = "#FF0000";
+                        } else {
+                            momentum  = "▼ En Baja";
+                            mom_color = "#94a3b8";
+                        }
+                    }
+
+                    const delta_abs = (Math.abs(diff) > 0 && Math.abs(diff) < 1) ? 
+                                       Math.abs(diff).toFixed(3) : 
+                                       Math.abs(diff).toFixed(2);
+                    const delta_str = (diff > 0 ? '+' : '-') + delta_abs + ' pp';
+                    const delta_arrow = diff > 0 ? '▲' : diff < 0 ? '▼' : '→';
+                    let   delta_color = "#94a3b8";
+                    if (diff > 0)               delta_color = "#22c55e";
+                    else if (diff < 0 && last_val < 0) delta_color = "#FF0000";
+
+                    delta_text = `<span style="color:${delta_color};font-size:11px;font-weight:700;">${delta_arrow} ${delta_str}</span>`;
                 }
 
-                // Legend removed — visual hierarchy is self-explanatory.
+                const last_s = scores[scores.length - 1] || 0;
                 layout.showlegend = false;
 
                 layout.annotations = [
-                    // Momentum pill — top-left
                     {
                         x: 0, y: 1.13, xref: 'paper', yref: 'paper',
                         xanchor: 'left', yanchor: 'top',
-                        text: `<b><span style="color:${momentum_color};">${momentum_label}</span></b>`,
+                        text: `<b><span style="color:${mom_color};">${momentum}</span></b>`,
                         showarrow: false,
                         font: { size: 12, family: 'Inter' }
                     },
-                    // Delta + Score — top-right
                     {
                         x: 1, y: 1.15, xref: 'paper', yref: 'paper',
                         xanchor: 'right', yanchor: 'top',
-                        text: `<b><span style="font-size:14px;color:#0f172a;">${(last_sh > 0 && last_sh < 1) ? last_sh.toFixed(3) : last_sh.toFixed(2)}%</span></b>  ` +
-                              `<span style="color:${delta_color}; font-size:11px; font-weight:600;">${delta_arrow} ${delta_abs} pp</span><br>` +
+                        text: `<b><span style="font-size:14px;color:${last_val < 0 ? '#FF0000' : '#0f172a'};">` +
+                              `${(last_val > 0 && last_val < 1) ? last_val.toFixed(3) : last_val.toFixed(2)}%` +
+                              `</span></b>  ${delta_text}<br>` +
                               `<span style="font-size:10px; color:#64748b;">Score: ${last_s.toFixed(1)}/10</span>`,
                         showarrow: false,
                         align: 'right'
                     }
                 ];
+                // ────────────────────────────────────────────────────────────────────────
                 
             } else if (m === 'estabilidad') {
                 // ═══════════════════════════════════════════════════════════
@@ -1938,7 +1968,58 @@ ${popoverContent}
                 const gapColor = gapVal >= 0 ? '#10b981' : '#ef4444';
                 const gapSign = gapVal >= 0 ? '+' : '';
 
+                // ── MOMENTUM & KPI ANNOTATIONS (STANDARDIZED) ──────────────────────────
+                const last_val = y_vals[y_vals.length - 1] ?? 0;
+                const prev_val = y_vals.length >= 2 ? y_vals[y_vals.length - 2] : null;
+
+                let momentum  = "→ Estable";
+                let mom_color = "#94a3b8";
+                let delta_text = `<span style="color:#94a3b8;font-size:11px;font-weight:700;">Δ: N/A</span>`;
+
+                if (prev_val !== null) {
+                    const diff = last_val - prev_val;
+
+                    if (diff > 0) {
+                        momentum  = "▲ Mejorando";
+                        mom_color = "#22c55e";
+                    } else if (diff < 0) {
+                        if (last_val < 0) {
+                            momentum  = "▼ Empeorando";
+                            mom_color = "#FF0000";
+                        } else {
+                            momentum  = "▼ En Baja";
+                            mom_color = "#94a3b8";
+                        }
+                    }
+
+                    const delta_str   = (diff > 0 ? '+' : '') + diff.toFixed(2) + ' pts';
+                    const delta_arrow = diff > 0 ? '▲' : diff < 0 ? '▼' : '→';
+                    let   delta_color = "#94a3b8";
+                    if (diff > 0)               delta_color = "#22c55e";
+                    else if (diff < 0 && last_val < 0) delta_color = "#FF0000";
+
+                    delta_text = `<span style="color:${delta_color};font-size:11px;font-weight:700;">${delta_arrow} ${delta_str}</span>`;
+                }
+
+                layout.margin.t = Math.max(layout.margin.t || 0, 50);
+
                 layout.annotations = [
+                    {
+                        x: 0, y: 1.13, xref: 'paper', yref: 'paper',
+                        xanchor: 'left', yanchor: 'top',
+                        text: `<b><span style="color:${mom_color};">${momentum}</span></b>`,
+                        showarrow: false,
+                        font: { size: 12, family: 'Inter' }
+                    },
+                    {
+                        x: 1, y: 1.15, xref: 'paper', yref: 'paper',
+                        xanchor: 'right', yanchor: 'top',
+                        text: `<b><span style="font-size:14px;color:${last_val < 0 ? '#FF0000' : '#0f172a'};">` +
+                              `${last_val.toFixed(2)} / 10` +
+                              `</span></b>  ${delta_text}`,
+                        showarrow: false,
+                        align: 'right'
+                    },
                     // KPI: Target Label (over gauge)
                     {
                         x: targetV, y: barH*1.1 + 0.1, xref: 'x2', yref: 'y2',
@@ -2002,6 +2083,62 @@ ${popoverContent}
                     hovertemplate: '%{customdata}<extra></extra>'
                 });
                 layout.shapes = [{ type: 'line', x0: 0, x1: 1, xref: 'paper', y0: 5, y1: 5, line: { color: '#94a3b8', width: 1 } }];
+
+                // ── MOMENTUM & KPI ANNOTATIONS (STANDARDIZED) ──────────────────────────
+                const last_val = y_vals[y_vals.length - 1] ?? 0;
+                const prev_val = y_vals.length >= 2 ? y_vals[y_vals.length - 2] : null;
+
+                let momentum  = "→ Estable";
+                let mom_color = "#94a3b8";
+                let delta_text = `<span style="color:#94a3b8;font-size:11px;font-weight:700;">Δ: N/A</span>`;
+
+                if (prev_val !== null) {
+                    const diff = last_val - prev_val;
+
+                    if (diff > 0) {
+                        momentum  = "▲ Mejorando";
+                        mom_color = "#22c55e";
+                    } else if (diff < 0) {
+                        if (last_val < 0) {
+                            momentum  = "▼ Empeorando";
+                            mom_color = "#FF0000";
+                        } else {
+                            momentum  = "▼ En Baja";
+                            mom_color = "#94a3b8";
+                        }
+                    }
+
+                    const delta_str   = (diff > 0 ? '+' : '') + diff.toFixed(2) + ' pts';
+                    const delta_arrow = diff > 0 ? '▲' : diff < 0 ? '▼' : '→';
+                    let   delta_color = "#94a3b8";
+                    if (diff > 0)               delta_color = "#22c55e";
+                    else if (diff < 0 && last_val < 0) delta_color = "#FF0000";
+
+                    delta_text = `<span style="color:${delta_color};font-size:11px;font-weight:700;">${delta_arrow} ${delta_str}</span>`;
+                }
+
+                layout.margin = layout.margin || {};
+                layout.margin.t = Math.max(layout.margin.t || 0, 50);
+
+                layout.annotations = [
+                    {
+                        x: 0, y: 1.13, xref: 'paper', yref: 'paper',
+                        xanchor: 'left', yanchor: 'top',
+                        text: `<b><span style="color:${mom_color};">${momentum}</span></b>`,
+                        showarrow: false,
+                        font: { size: 12, family: 'Inter' }
+                    },
+                    {
+                        x: 1, y: 1.15, xref: 'paper', yref: 'paper',
+                        xanchor: 'right', yanchor: 'top',
+                        text: `<b><span style="font-size:14px;color:${last_val < 0 ? '#FF0000' : '#0f172a'};">` +
+                              `${last_val.toFixed(2)} / 10` +
+                              `</span></b>  ${delta_text}`,
+                        showarrow: false,
+                        align: 'right'
+                    }
+                ];
+                // ────────────────────────────────────────────────────────────────────────
             
             } else if (m === 'eficiencia_casino' || m === 'eficiencia_deportes') {
                 // ═══════════════════════════════════════════════════════════
@@ -2187,7 +2324,53 @@ ${popoverContent}
                 const gapColor = gapVal >= 0 ? '#10b981' : '#ef4444';
                 const gapSign = gapVal >= 0 ? '+' : '';
 
+                // --- MOMENTUM & KPI ANNOTATIONS (STANDARDIZED) ---
+                const last_val = y_vals[y_vals.length - 1] || 0;
+                const prev_val = y_vals.length >= 2 ? y_vals[y_vals.length - 2] : null;
+
+                let momentum = "→ Estable";
+                let mom_color = "#64748b"; // Neutral slate for stable or drops
+                let delta_text = `<span style="color:#64748b; font-size:11px; font-weight:700;">Δ: N/A</span>`;
+
+                if (prev_val !== null) {
+                    const diff = last_val - prev_val;
+                    
+                    if (diff > 0) { 
+                        momentum = "▲ Mejorando"; 
+                        mom_color = config.color; 
+                    } else if (diff < 0) { 
+                        momentum = "▼ En Baja"; 
+                        mom_color = "#64748b";    
+                    }
+
+                    if (last_val < 0) {
+                        mom_color = "#FF0000"; 
+                    }
+
+                    const delta_str = (diff > 0 ? '+' : '') + diff.toFixed(2) + ' pts';
+                    const delta_arrow = diff > 0 ? '▲' : (diff < 0 ? '▼' : '→');
+                    
+                    const delta_color = (last_val < 0) ? '#FF0000' : (diff > 0 ? config.color : '#64748b');
+                    delta_text = `<span style="color:${delta_color}; font-size:11px; font-weight:700;">${delta_arrow} ${delta_str}</span>`;
+                }
+
+                layout.margin.t = Math.max(layout.margin.t || 0, 50);
+
                 layout.annotations = [
+                    {
+                        x: 0, y: 1.13, xref: 'paper', yref: 'paper',
+                        xanchor: 'left', yanchor: 'top',
+                        text: `<b><span style="color:${mom_color};">${momentum}</span></b>`,
+                        showarrow: false,
+                        font: {size: 12, family: 'Inter'}
+                    },
+                    {
+                        x: 1, y: 1.15, xref: 'paper', yref: 'paper',
+                        xanchor: 'right', yanchor: 'top',
+                        text: `<b><span style="font-size:14px;color:${last_val < 0 ? '#FF0000' : '#0f172a'};">${last_val.toFixed(2)} / 10</span></b>  ${delta_text}`,
+                        showarrow: false,
+                        align: 'right'
+                    },
                     // KPI: Target Label (over gauge)
                     {
                         x: targetV, y: barH*1.1 + 0.1, xref: 'x2', yref: 'y2',
@@ -2269,8 +2452,54 @@ ${popoverContent}
                     hoverinfo: 'skip'
                 });
 
+                // --- MOMENTUM & KPI ANNOTATIONS (STANDARDIZED) ---
+                const last_val = y_vals[y_vals.length - 1] || 0;
+                const prev_val = y_vals.length >= 2 ? y_vals[y_vals.length - 2] : null;
+                
+                let momentum = "→ Estable";
+                let mom_color = "#64748b"; // Neutral slate for stable or drops
+                let delta_text = `<span style="color:#64748b; font-size:11px; font-weight:700;">Δ: N/A</span>`;
+
+                if (prev_val !== null) {
+                    const diff = last_val - prev_val;
+                    
+                    if (diff > 0) { 
+                        momentum = "▲ Mejorando"; 
+                        mom_color = config.color; 
+                    } else if (diff < 0) { 
+                        momentum = "▼ En Baja"; 
+                        mom_color = "#64748b";    
+                    }
+
+                    if (last_val < 0) {
+                        mom_color = "#FF0000"; 
+                    }
+
+                    const delta_str = (diff > 0 ? '+' : '') + diff.toFixed(2) + ' pts';
+                    const delta_arrow = diff > 0 ? '▲' : (diff < 0 ? '▼' : '→');
+                    
+                    const delta_color = (last_val < 0) ? '#FF0000' : (diff > 0 ? config.color : '#64748b');
+                    delta_text = `<span style="color:${delta_color}; font-size:11px; font-weight:700;">${delta_arrow} ${delta_str}</span>`;
+                }
+                
+                layout.margin.t = Math.max(layout.margin.t || 0, 50);
+
                 // Annotations: KPI number + Spanish threshold badge (NO target label)
                 layout.annotations = [
+                    {
+                        x: 0, y: 1.13, xref: 'paper', yref: 'paper',
+                        xanchor: 'left', yanchor: 'top',
+                        text: `<b><span style="color:${mom_color};">${momentum}</span></b>`,
+                        showarrow: false,
+                        font: {size: 12, family: 'Inter'}
+                    },
+                    {
+                        x: 1, y: 1.15, xref: 'paper', yref: 'paper',
+                        xanchor: 'right', yanchor: 'top',
+                        text: `<b><span style="font-size:14px;color:${last_val < 0 ? '#FF0000' : '#0f172a'};">${last_val.toFixed(2)} / 10</span></b>  ${delta_text}`,
+                        showarrow: false,
+                        align: 'right'
+                    },
                     {
                         x: 0.5, y: 0.72, xref: 'paper', yref: 'paper',
                         xanchor: 'center', yanchor: 'middle',
@@ -2354,7 +2583,7 @@ ${popoverContent}
                         line: { color: '#ffffff', width: x_vals.map((_, i) => i === x_vals.length - 1 ? 1.5 : 0) }
                     },
                     fill: 'tozeroy',
-                    fillcolor: hexToRgba(config.color, 0.08),
+                    fillcolor: hexToRgba(config.color, 0.15),
                     connectgaps: true,
                     cliponaxis: false,
                     hovertemplate: '%{customdata}<extra></extra>'
@@ -2419,13 +2648,10 @@ ${popoverContent}
                 } 
 
                 // Lógica de estado de la pendiente global 
-                let statusText = "→ Estable" ; 
                 let statusColor = "#64748b" ; 
                 if (overall_delta > 0.5 ) { 
-                    statusText = "▲ Tendencia Positiva" ; 
                     statusColor = "#10b981" ; 
                 } else if (overall_delta < -0.5 ) { 
-                    statusText = "▼ Tendencia Negativa" ; 
                     statusColor = "#ef4444" ; 
                 } 
 
@@ -2444,7 +2670,7 @@ ${popoverContent}
                         line: { color: '#ffffff', width: x_vals.map((_, i) => i === x_vals.length - 1 ? 2 : 1 ) } 
                     }, 
                     fill: 'tozeroy' , 
-                    fillcolor: hexToRgba(config.color, 0.12 ), 
+                    fillcolor: hexToRgba(config.color, 0.15), 
                     hovertemplate: '%{customdata}<extra></extra>' 
                 }); 
 
@@ -2461,25 +2687,58 @@ ${popoverContent}
                     }); 
                 } 
 
-                const delta_str = (overall_delta > 0 ? '+' : '') + overall_delta.toFixed(2 ); 
+                // ── MOMENTUM & KPI ANNOTATIONS (STANDARDIZED) ──────────────────────────
+                const last_val = scores[scores.length - 1] ?? 0;
+                const prev_val = scores.length >= 2 ? scores[scores.length - 2] : null;
 
-                layout.annotations = [ 
-                    { 
-                        x: 0, y: 1.13, xref: 'paper', yref: 'paper' , 
-                        xanchor: 'left', yanchor: 'top' , 
-                        text: `<b><span style="color:${statusColor};">${statusText}</span></b>` , 
-                        showarrow: false , 
-                        font: {size: 12, family: 'Inter' } 
-                    }, 
-                    { 
-                        x: 1, y: 1.15, xref: 'paper', yref: 'paper' , 
-                        xanchor: 'right', yanchor: 'top' , 
-                        text: `<b><span style="font-size:14px;color:#0f172a;">${lastVal.toFixed(2)} / 10</span></b><br>`  + 
-                              `<span style="color:${statusColor}; font-size:11px; font-weight:600;">Δ Global: ${delta_str} pts</span>` , 
-                        showarrow: false , 
-                        align: 'right' 
-                    } 
-                ]; 
+                let momentum  = "→ Estable";
+                let mom_color = "#94a3b8";
+                let delta_text = `<span style="color:#94a3b8;font-size:11px;font-weight:700;">Δ: N/A</span>`;
+
+                if (prev_val !== null) {
+                    const diff = last_val - prev_val;
+
+                    if (diff > 0) {
+                        momentum  = "▲ Mejorando";
+                        mom_color = "#22c55e";
+                    } else if (diff < 0) {
+                        if (last_val < 0) {
+                            momentum  = "▼ Empeorando";
+                            mom_color = "#FF0000";
+                        } else {
+                            momentum  = "▼ En Baja";
+                            mom_color = "#94a3b8";
+                        }
+                    }
+
+                    const delta_str   = (diff > 0 ? '+' : '') + diff.toFixed(2) + ' pts';
+                    const delta_arrow = diff > 0 ? '▲' : diff < 0 ? '▼' : '→';
+                    let   delta_color = "#94a3b8";
+                    if (diff > 0)               delta_color = "#22c55e";
+                    else if (diff < 0 && last_val < 0) delta_color = "#FF0000";
+
+                    delta_text = `<span style="color:${delta_color};font-size:11px;font-weight:700;">${delta_arrow} ${delta_str}</span>`;
+                }
+
+                layout.annotations = [
+                    {
+                        x: 0, y: 1.13, xref: 'paper', yref: 'paper',
+                        xanchor: 'left', yanchor: 'top',
+                        text: `<b><span style="color:${mom_color};">${momentum}</span></b>`,
+                        showarrow: false,
+                        font: { size: 12, family: 'Inter' }
+                    },
+                    {
+                        x: 1, y: 1.15, xref: 'paper', yref: 'paper',
+                        xanchor: 'right', yanchor: 'top',
+                        text: `<b><span style="font-size:14px;color:${last_val < 0 ? '#FF0000' : '#0f172a'};">` +
+                              `${last_val.toFixed(2)} / 10` +
+                              `</span></b><br>  ${delta_text}`,
+                        showarrow: false,
+                        align: 'right'
+                    }
+                ];
+                // ────────────────────────────────────────────────────────────────────────
 
                 // Force X-axis to show all months 
                 layout.xaxis.tickvals = x_vals; 
@@ -2561,56 +2820,65 @@ ${popoverContent}
                         line: { color: '#ffffff', width: x_vals.map((_, i) => i === x_vals.length - 1 ? 2 : 0) } 
                     }, 
                     fill: 'tozeroy', 
-                    fillcolor: hexToRgba(config.color, 0.08), 
+                    fillcolor: hexToRgba(config.color, 0.15), 
                     hovertemplate: '%{customdata}<extra></extra>' 
                 }); 
                 
-                addCriticalEnclosure(layout, x_vals, criticalFlags); 
                 
-                layout.shapes = [{ 
-                    type: 'rect', x0: 0, x1: 1, xref: 'paper', y0: 3.5, y1: 5.5, yref: 'y', 
-                    fillcolor: 'rgba(34, 197, 94, 0.08)', line: {width: 0}, layer: 'below' 
-                }]; 
 
-                // --- MOMENTUM & KPI ANNOTATIONS --- 
-                let momentum = "→ Estable"; 
-                let mom_color = "#64748b"; 
-                if (scores.length >= 2) { 
-                    const lm = scores[scores.length-1] || 0; 
-                    const pm = scores[scores.length-2] || 0; 
-                    if (lm - pm > 0.5) { momentum = "▲ Mejorando"; mom_color = "#10b981"; } 
-                    else if (lm - pm < -0.5) { momentum = "▼ Empeorando"; mom_color = "#ef4444"; } 
-                } 
 
-                const last_s = scores[scores.length - 1] || 0; 
-                const delta_color = last_var_pts >= 0 ? '#10b981' : '#ef4444'; 
-                const delta_arrow = last_var_pts >= 0 ? '▲' : '▼'; 
-                const delta_str = (last_var_pts > 0 ? '+' : '') + last_var_pts.toFixed(2); 
-                
-                let delta_text = ''; 
-                if (scores.length >= 2) { 
-                    delta_text = `<span style="color:${delta_color}; font-size:11px; font-weight:600;">${delta_arrow} ${delta_str} pts</span><br>`; 
-                } else { 
-                    delta_text = `<span style="color:#64748b; font-size:11px; font-weight:600;">Δ: N/A</span><br>`; 
-                } 
+                // ── MOMENTUM & KPI ANNOTATIONS (STANDARDIZED) ──────────────────────────
+                const last_val = scores[scores.length - 1] ?? 0;
+                const prev_val = scores.length >= 2 ? scores[scores.length - 2] : null;
 
-                layout.annotations = [ 
-                    { 
-                        x: 0, y: 1.13, xref: 'paper', yref: 'paper', 
-                        xanchor: 'left', yanchor: 'top', 
-                        text: `<b><span style="color:${mom_color};">${momentum}</span></b>`, 
-                        showarrow: false, 
-                        font: {size: 12, family: 'Inter'} 
-                    }, 
-                    { 
-                        x: 1, y: 1.15, xref: 'paper', yref: 'paper', 
-                        xanchor: 'right', yanchor: 'top', 
-                        text: `<b><span style="font-size:14px;color:#0f172a;">${last_s.toFixed(2)} / 5</span></b>  ` + delta_text, 
-                        showarrow: false, 
-                        align: 'right' 
-                    } 
-                ]; 
-                // ---------------------------------- 
+                let momentum  = "→ Estable";
+                let mom_color = "#94a3b8";
+                let delta_text = `<span style="color:#94a3b8;font-size:11px;font-weight:700;">Δ: N/A</span>`;
+
+                if (prev_val !== null) {
+                    const diff = last_val - prev_val;
+
+                    if (diff > 0) {
+                        momentum  = "▲ Mejorando";
+                        mom_color = "#22c55e";
+                    } else if (diff < 0) {
+                        if (last_val < 0) {
+                            momentum  = "▼ Empeorando";
+                            mom_color = "#FF0000";
+                        } else {
+                            momentum  = "▼ En Baja";
+                            mom_color = "#94a3b8";
+                        }
+                    }
+
+                    const delta_str   = (diff > 0 ? '+' : '') + diff.toFixed(2) + ' pts';
+                    const delta_arrow = diff > 0 ? '▲' : diff < 0 ? '▼' : '→';
+                    let   delta_color = "#94a3b8";
+                    if (diff > 0)               delta_color = "#22c55e";
+                    else if (diff < 0 && last_val < 0) delta_color = "#FF0000";
+
+                    delta_text = `<span style="color:${delta_color};font-size:11px;font-weight:700;">${delta_arrow} ${delta_str}</span>`;
+                }
+
+                layout.annotations = [
+                    {
+                        x: 0, y: 1.13, xref: 'paper', yref: 'paper',
+                        xanchor: 'left', yanchor: 'top',
+                        text: `<b><span style="color:${mom_color};">${momentum}</span></b>`,
+                        showarrow: false,
+                        font: { size: 12, family: 'Inter' }
+                    },
+                    {
+                        x: 1, y: 1.15, xref: 'paper', yref: 'paper',
+                        xanchor: 'right', yanchor: 'top',
+                        text: `<b><span style="font-size:14px;color:${last_val < 0 ? '#FF0000' : '#0f172a'};">` +
+                              `${last_val.toFixed(2)} / 5` +
+                              `</span></b>  ${delta_text}`,
+                        showarrow: false,
+                        align: 'right'
+                    }
+                ];
+                // ────────────────────────────────────────────────────────────────────────
                 
                 layout.xaxis.tickvals = x_vals; 
                 layout.xaxis.ticktext = formatted_x; 
@@ -2650,95 +2918,149 @@ ${popoverContent}
                     name: 'Score', marker: { color: config.color, cornerradius: 4 },
                     hovertemplate: '%{customdata}<extra></extra>'
                 });
-            } else if (m === 'eficiencia_juego') {
-                // ═══════════════════════════════════════════════════════════
-                //  EFICIENCIA DE JUEGO (Turnover vs Depósitos) - BAR CHART
-                // ═══════════════════════════════════════════════════════════
-                const hover_texts = [];
-                const deps = series.map(d => d.total_depositos || 0);
-                const ap_total = series.map(d => d.total_apuesta_total || 0); 
-                const margins = y_vals;
-                
-                const bar_colors = [];
-                let last_var_pp = 0;
 
-                for (let i = 0; i < series.length; i++) {
-                    const s = margins[i];
-                    const prev_s = i > 0 ? margins[i-1] : null;
+                // ── MOMENTUM & KPI ANNOTATIONS (STANDARDIZED) ──────────────────────────
+                const last_val = y_vals[y_vals.length - 1] ?? 0;
+                const prev_val = y_vals.length >= 2 ? y_vals[y_vals.length - 2] : null;
 
-                    let is_critical = false;
-                    let has_event = false;
-                    let evento = null;
-                    let var_pp = null;
+                let momentum  = "→ Estable";
+                let mom_color = "#94a3b8";
+                let delta_text = `<span style="color:#94a3b8;font-size:11px;font-weight:700;">Δ: N/A</span>`;
 
-                    if (prev_s !== null) {
-                        var_pp = s - prev_s;
-                        if (i === series.length - 1) last_var_pp = var_pp;
+                if (prev_val !== null) {
+                    const diff = last_val - prev_val;
 
-                        // Thresholds for anomalies in Turnover Efficiency
-                        if (var_pp <= -20) {
-                            is_critical = true;
-                            has_event = true;
-                            evento = "⚠ Caída crítica";
-                        } else if (var_pp >= 30) {
-                            has_event = true;
-                            evento = "⚠ Pico inusual";
+                    if (diff > 0) {
+                        momentum  = "▲ Mejorando";
+                        mom_color = "#22c55e";
+                    } else if (diff < 0) {
+                        if (last_val < 0) {
+                            momentum  = "▼ Empeorando";
+                            mom_color = "#FF0000";
+                        } else {
+                            momentum  = "▼ En Baja";
+                            mom_color = "#94a3b8";
                         }
                     }
 
-                    // Red color for negative efficiency, config.color for positive
-                    bar_colors.push(s < 0 ? 'rgba(239, 68, 68, 0.7)' : hexToRgba(config.color, 0.8));
+                    const delta_str   = (diff > 0 ? '+' : '') + diff.toFixed(2) + ' pts';
+                    const delta_arrow = diff > 0 ? '▲' : diff < 0 ? '▼' : '→';
+                    let   delta_color = "#94a3b8";
+                    if (diff > 0)               delta_color = "#22c55e";
+                    else if (diff < 0 && last_val < 0) delta_color = "#FF0000";
 
+                    delta_text = `<span style="color:${delta_color};font-size:11px;font-weight:700;">${delta_arrow} ${delta_str}</span>`;
+                }
+
+                layout.margin = layout.margin || {};
+                layout.margin.t = Math.max(layout.margin.t || 0, 50);
+
+                layout.annotations = [
+                    {
+                        x: 0, y: 1.13, xref: 'paper', yref: 'paper',
+                        xanchor: 'left', yanchor: 'top',
+                        text: `<b><span style="color:${mom_color};">${momentum}</span></b>`,
+                        showarrow: false,
+                        font: { size: 12, family: 'Inter' }
+                    },
+                    {
+                        x: 1, y: 1.15, xref: 'paper', yref: 'paper',
+                        xanchor: 'right', yanchor: 'top',
+                        text: `<b><span style="font-size:14px;color:${last_val < 0 ? '#FF0000' : '#0f172a'};">` +
+                              `${last_val.toFixed(2)} / 10` +
+                              `</span></b>  ${delta_text}`,
+                        showarrow: false,
+                        align: 'right'
+                    }
+                ];
+                // ────────────────────────────────────────────────────────────────────────
+            } else if (m === 'eficiencia_juego') {
+                // ═══════════════════════════════════════════════════════════
+                //  EFICIENCIA DE JUEGO (Turnover vs Depósitos) - Dynamic Bars
+                // ═══════════════════════════════════════════════════════════
+                const hover_texts = [];
+                const scores = y_vals;
+                let last_var_pts = 0;
+                const bar_colors = [];
+
+                for (let i = 0; i < series.length; i++) {
+                    const s = y_vals[i];
+                    const prev_s = i > 0 ? y_vals[i-1] : null;
+                    
+                    const dep_val = series[i].total_depositos || 0;
+                    const to_dep = series[i].total_apuesta_deportiva || 0;
+                    const to_cas = series[i].total_apuesta_casino || 0;
+                    const total_to = to_dep + to_cas;
+                    
                     const real_data = {
-                        "Depósitos": formatMoney(deps[i]),
-                        "Apuestas Totales": formatMoney(ap_total[i]),
-                        "Eficiencia %": formatPct(s)
+                        "Turnover (Apuestas)": '$' + formatInt(total_to),
+                        "Depósitos": '$' + formatInt(dep_val)
                     };
                     
                     const change_data = {};
-                    if (var_pp !== null) {
-                        change_data["Δ Eficiencia"] = (var_pp > 0 ? '+' : '') + formatPP(var_pp);
+                    if (prev_s !== null) {
+                        const d_s = s - prev_s;
+                        change_data["Δ Eficiencia"] = (d_s > 0 ? '+' : '') + d_s.toFixed(2) + ' pp';
+                        if (i === series.length - 1) last_var_pts = d_s;
+                        
+                        // COLORES ESTRICTOS SIN BORDES: Verde Oscuro Intenso o Rojo Intenso Puro
+                        if (d_s >= 0) {
+                            bar_colors.push('#006600');  // Verde Oscuro Intenso
+                        } else {
+                            bar_colors.push('#FF0000');  // Rojo Intenso Puro
+                        }
+                    } else {
+                        // REGLA ESTRICTA: El primer mes hereda el Verde Oscuro
+                        bar_colors.push('#006600'); 
                     }
-                    if (has_event && evento) change_data["Evento"] = evento;
-                    
-                    // Passing 0 as score since this is purely a contextual metric
-                    hover_texts.push(buildTooltipHTML(formatted_x[i], real_data, change_data, 0));
+
+                    hover_texts.push(buildTooltipHTML(formatted_x[i], real_data, change_data, s));
                 }
 
                 traces.push({
-                    x: x_vals, 
-                    y: margins, 
-                    customdata: hover_texts, 
-                    type: 'bar', 
-                    name: 'Eficiencia %', 
-                    marker: { color: bar_colors, cornerradius: 4 },
-                    text: margins.map(v => v.toFixed(1) + '%'),
+                    x: x_vals, y: y_vals, customdata: hover_texts,
+                    type: 'bar', name: 'Eficiencia',
+                    marker: { 
+                        color: bar_colors, 
+                        cornerradius: 4
+                    },
+                    text: y_vals.map(v => v.toFixed(1) + '%'),
                     textposition: 'outside',
-                    textfont: { size: 10, color: '#475569', family: 'Inter', weight: 600 },
-                    cliponaxis: false,
+                    textfont: { size: 10, color: '#64748b', weight: 600 },
                     hovertemplate: '%{customdata}<extra></extra>'
                 });
 
-                // Calculate Momentum for Annotations
-                let momentum = "→ Estable";
-                let mom_color = "#64748b";
-                if (margins.length >= 2) {
-                    const lm = margins[margins.length-1] || 0;
-                    const pm = margins[margins.length-2] || 0;
-                    if (lm - pm >= 10) { momentum = "▲ Mejorando"; mom_color = "#10b981"; }
-                    else if (lm - pm <= -10) { momentum = "▼ Empeorando"; mom_color = "#ef4444"; }
-                }
+                // ── MOMENTUM & KPI ANNOTATIONS (STANDARDIZED) ──────────────────────────
+                const last_val = scores[scores.length - 1] ?? 0;
+                const prev_val = scores.length >= 2 ? scores[scores.length - 2] : null;
 
-                const last_s = margins[margins.length - 1] || 0;
-                const delta_color = last_var_pp >= 0 ? '#10b981' : '#ef4444';
-                const delta_arrow = last_var_pp >= 0 ? '▲' : '▼';
-                const delta_str = (last_var_pp > 0 ? '+' : '') + last_var_pp.toFixed(2);
-                
-                let delta_pp_text = '';
-                if (margins.length >= 2) {
-                    delta_pp_text = `<span style="color:${delta_color}; font-size:11px; font-weight:600;">${delta_arrow} ${delta_str} pp</span><br>`;
-                } else {
-                    delta_pp_text = `<span style="color:#64748b; font-size:11px; font-weight:600;">Δ: N/A</span><br>`;
+                let momentum  = "→ Estable";
+                let mom_color = "#94a3b8";
+                let delta_text = `<span style="color:#94a3b8;font-size:11px;font-weight:700;">Δ: N/A</span>`;
+
+                if (prev_val !== null) {
+                    const diff = last_val - prev_val;
+
+                    if (diff > 0) {
+                        momentum  = "▲ Mejorando";
+                        mom_color = "#22c55e";
+                    } else if (diff < 0) {
+                        if (last_val < 0) {
+                            momentum  = "▼ Empeorando";
+                            mom_color = "#FF0000";
+                        } else {
+                            momentum  = "▼ En Baja";
+                            mom_color = "#94a3b8";
+                        }
+                    }
+
+                    const delta_str   = (diff > 0 ? '+' : '') + diff.toFixed(2) + ' pp';
+                    const delta_arrow = diff > 0 ? '▲' : diff < 0 ? '▼' : '→';
+                    let   delta_color = "#94a3b8";
+                    if (diff > 0)               delta_color = "#22c55e";
+                    else if (diff < 0 && last_val < 0) delta_color = "#FF0000";
+
+                    delta_text = `<span style="color:${delta_color};font-size:11px;font-weight:700;">${delta_arrow} ${delta_str}</span>`;
                 }
 
                 layout.annotations = [
@@ -2747,29 +3069,31 @@ ${popoverContent}
                         xanchor: 'left', yanchor: 'top',
                         text: `<b><span style="color:${mom_color};">${momentum}</span></b>`,
                         showarrow: false,
-                        font: {size: 12, family: 'Inter'}
+                        font: { size: 12, family: 'Inter' }
                     },
                     {
                         x: 1, y: 1.15, xref: 'paper', yref: 'paper',
                         xanchor: 'right', yanchor: 'top',
-                        text: `<b><span style="font-size:14px;color:#0f172a;">${last_s.toFixed(2)}%</span></b>  ` + delta_pp_text,
+                        text: `<b><span style="font-size:14px;color:${last_val < 0 ? '#FF0000' : '#0f172a'};">` +
+                              `${last_val.toFixed(2)}%` +
+                              `</span></b>  ${delta_text}`,
                         showarrow: false,
                         align: 'right'
                     }
                 ];
+                // ────────────────────────────────────────────────────────────────────────
+                
+                // Force X-axis to show all months
+                layout.xaxis.tickvals = x_vals;
+                layout.xaxis.ticktext = formatted_x;
 
-                // Force X-axis to show all months 
-                layout.xaxis.tickvals = x_vals; 
-                layout.xaxis.ticktext = formatted_x; 
-
-                layout.margin = { t: 50, b: 60, l: 60, r: 30 }; // Extra top margin for annotations 
+                layout.margin = { t: 50, b: 60, l: 60, r: 30 }; 
+                layout.showlegend = false;
                 layout.yaxis = { 
                     showline: true, linewidth: 1.5, linecolor: '#cbd5e1', 
-                    ticks: 'outside', tickcolor: '#cbd5e1', ticklen: 5,
-                    showgrid: true, gridcolor: 'rgba(241, 245, 249, 0.6)', zeroline: true, zerolinecolor: '#cbd5e1', 
-                    tickfont: { size: 10, color: '#475569', family: 'Inter' },
-                    ticksuffix: '%',
-                    autorange: true 
+                    showgrid: true, gridcolor: 'rgba(241, 245, 249, 0.6)',
+                    tickfont: { size: 10, color: '#94a3b8', family: 'Inter' },
+                    ticksuffix: '%'
                 };
             }
             

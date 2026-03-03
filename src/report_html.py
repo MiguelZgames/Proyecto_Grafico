@@ -906,12 +906,10 @@ def generate_html_report(df_agents, df_monthly=None, out_path="reports/dashboard
             opt.textContent = name + ' ' + year;
             monthFilterEl.appendChild(opt);
         });
-        // Default to January (first month containing '01', or first available)
-        const januaryMonth = sortedMonths.find(m => m.endsWith('-01'));
-        if (januaryMonth) {
-            monthFilterEl.value = januaryMonth;
-        } else {
-            monthFilterEl.value = sortedMonths[0];
+        // Auto-select last available month (most recent completed month)
+        const lastMonth = sortedMonths[sortedMonths.length - 1];
+        if (lastMonth) {
+            monthFilterEl.value = lastMonth;
         }
     }
 
@@ -1267,7 +1265,13 @@ def generate_html_report(df_agents, df_monthly=None, out_path="reports/dashboard
             return result;
         });
         
-        // Re-Rank based on Score (Descending)
+        // Re-Rank based on Score (Descending) - exclude GLOBAL agent
+        const globalIdx = displayedAgents.findIndex(a => 
+            a.id_agente === 'GLOBAL' || 
+            (typeof a.nombre_usuario_agente === 'string' && a.nombre_usuario_agente.includes('vista global'))
+        );
+        const globalEntry = globalIdx > -1 ? displayedAgents.splice(globalIdx, 1)[0] : null;
+        
         displayedAgents.sort((a, b) => {
             if (a._noData && !b._noData) return 1;
             if (!a._noData && b._noData) return -1;
@@ -1278,6 +1282,12 @@ def generate_html_report(df_agents, df_monthly=None, out_path="reports/dashboard
         displayedAgents.forEach((a, i) => {
             a.rank_global = i + 1;
         });
+        
+        // Re-insert GLOBAL agent at top (unpinned from ranking)
+        if (globalEntry) {
+            globalEntry.rank_global = null;
+            displayedAgents.unshift(globalEntry);
+        }
         
         // Update UI
         renderList(displayedAgents);
@@ -1298,7 +1308,35 @@ def generate_html_report(df_agents, df_monthly=None, out_path="reports/dashboard
 
     function renderList(data) {
         listEl.innerHTML = '';
-        data.forEach(a => {
+        
+        // Separate GLOBAL agent and regular agents
+        const globalAgent = data.find(a => 
+            a.id_agente === 'GLOBAL' || 
+            (typeof a.nombre_usuario_agente === 'string' && a.nombre_usuario_agente.includes('vista global'))
+        );
+        const regularAgents = data.filter(a => a !== globalAgent);
+        
+        // Render GLOBAL agent first (pinned, no rank)
+        if (globalAgent) {
+            const el = document.createElement('div');
+            el.className = 'agent-item';
+            el.dataset.id = globalAgent.id_agente;
+            el.dataset.clase = globalAgent.Clase || '';
+            el.dataset.name = (globalAgent.nombre_usuario_agente || globalAgent.id_agente).toString().toLowerCase();
+            el.style.background = 'linear-gradient(135deg, #eff6ff, #f0fdf4)';
+            el.style.borderLeft = '3px solid #60a5fa';
+            el.style.fontWeight = '600';
+            el.innerHTML = `
+                <div style="display:flex; align-items:center; gap:12px; width:100%;">
+                    <div class="agent-rank" style="font-size:14px;">🌟</div>
+                    <div class="agent-name">${globalAgent.nombre_usuario_agente || globalAgent.id_agente}</div>
+                </div>
+            `;
+            el.onclick = () => selectAgent(globalAgent.id_agente);
+            listEl.appendChild(el);
+        }
+        
+        regularAgents.forEach(a => {
             if (a._noData) return;
             
             const el = document.createElement('div');
@@ -1953,6 +1991,14 @@ def generate_html_report(df_agents, df_monthly=None, out_path="reports/dashboard
     // Initial Load
     document.addEventListener('DOMContentLoaded', () => {
         updateTopAgencies();
+        // Auto-select the global view agent if present
+        const globalAgent = allAgents.find(a =>
+            a.id_agente === 'GLOBAL' ||
+            (typeof a.nombre_usuario_agente === 'string' && a.nombre_usuario_agente.includes('vista global'))
+        );
+        if (globalAgent) {
+            setTimeout(() => selectAgent(globalAgent.id_agente), 50);
+        }
     });
     
     // Window Resize Handler
